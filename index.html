@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Desktop · 我的桌面</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
+
+    <!-- 本地依赖：无需外网，file:// 双击打开也能瞬间渲染 -->
+    <script src="assets/vendor/icons-data.js"></script>
+    <script src="assets/vendor/iconify-icon.min.js"></script>
+    <script src="assets/vendor/lunar.js"></script>
+
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+    <!-- 壁纸层 -->
+    <div id="wallpaper" class="wallpaper"></div>
+    <div class="wallpaper-overlay"></div>
+
+    <!-- 闲置时整体淡出的图层（含所有组件） -->
+    <div id="fadeLayer">
+
+        <div id="pageContent" class="page-content">
+
+            <!-- ============ 顶部三栏：日历 | 时钟+搜索 | 天气 ============ -->
+            <div class="stage">
+
+                <!-- 左：日历 -->
+                <aside class="stage-col stage-left">
+                    <div class="card calendar-card">
+                        <div class="card-head">
+                            <button id="calPrevBtn" class="cal-nav" title="上个月">
+                                <iconify-icon icon="mdi:chevron-left" width="20" height="20"></iconify-icon>
+                            </button>
+                            <div class="cal-title-wrap">
+                                <div class="cal-title" id="calTitle">----年--月</div>
+                                <div class="cal-week" id="calWeek">第 -- 周</div>
+                            </div>
+                            <button id="calNextBtn" class="cal-nav" title="下个月">
+                                <iconify-icon icon="mdi:chevron-right" width="20" height="20"></iconify-icon>
+                            </button>
+                            <button id="calTodayBtn" class="cal-today" title="回到今天">
+                                <iconify-icon icon="mdi:circle" width="14" height="14"></iconify-icon>
+                            </button>
+                        </div>
+                        <div class="cal-weekdays">
+                            <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span>
+                            <span class="weekend">六</span><span class="weekend">日</span>
+                        </div>
+                        <div class="cal-grid" id="calGrid"></div>
+                        <div class="cal-footer" id="calFooter">—</div>
+                    </div>
+                </aside>
+
+                <!-- 中：时钟 + 搜索 -->
+                <div class="stage-col stage-center">
+                    <header class="hero">
+                        <div class="greet-line" id="clockGreet">你好</div>
+                        <div class="clock-row">
+                            <!-- 左：公历 -->
+                            <div class="clock-side side-left">
+                                <div class="side-label"><iconify-icon icon="mdi:calendar-outline" width="14" height="14"></iconify-icon>公历</div>
+                                <div class="side-main date-line" id="clockDate">----年--月--日</div>
+                                <div class="side-sub" id="clockWeek">星期-</div>
+                            </div>
+                            <!-- 中：时钟 -->
+                            <div class="clock-widget">
+                                <!-- 模拟表盘（在后，指针平滑转动） -->
+                                <div class="clock-dial" id="clockDial">
+                                    <div class="dial-ticks" id="dialTicks"></div>
+                                    <div class="dial-hand hour" id="handHour"></div>
+                                    <div class="dial-hand minute" id="handMinute"></div>
+                                    <div class="dial-hand second" id="handSecond"></div>
+                                    <div class="dial-center"></div>
+                                </div>
+                                <!-- 数字时钟（在前，叠加在表盘中央） -->
+                                <div class="clock-digital">
+                                    <div class="clock-time" id="clockTime" title="点击切换 12/24 小时制">--:--:--</div>
+                                    <div class="clock-ampm" id="clockAmPm"></div>
+                                </div>
+                            </div>
+                            <!-- 右：农历 -->
+                            <div class="clock-side side-right">
+                                <div class="side-label"><iconify-icon icon="mdi:calendar-month-outline" width="14" height="14"></iconify-icon>农历</div>
+                                <div class="side-main lunar-line" id="clockLunar">--月--</div>
+                                <div class="side-sub" id="clockFestival">—</div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <section class="search-section">
+                        <div class="search-box" id="searchBox">
+                            <div class="engine-wrap">
+                                <button id="engineBtn" class="engine-btn" title="切换搜索引擎">
+                                    <iconify-icon icon="devicon:google" id="engineIcon" width="20" height="20"></iconify-icon>
+                                </button>
+                                <div id="engineDropdown" class="engine-dropdown hidden">
+                                    <button class="engine-option" data-engine="google">
+                                        <iconify-icon icon="devicon:google" width="16" height="16"></iconify-icon><span>Google</span>
+                                    </button>
+                                    <button class="engine-option" data-engine="bing">
+                                        <iconify-icon icon="logos:bing" width="16" height="16"></iconify-icon><span>Bing</span>
+                                    </button>
+                                    <button class="engine-option" data-engine="baidu">
+                                        <iconify-icon icon="ri:baidu-fill" width="16" height="16"></iconify-icon><span>百度</span>
+                                    </button>
+                                    <button class="engine-option" data-engine="duckduckgo">
+                                        <iconify-icon icon="logos:duckduckgo" width="16" height="16"></iconify-icon><span>DuckDuckGo</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="text" id="searchInput" class="search-input" placeholder="搜索，或直接按回车……" autocomplete="off" spellcheck="false">
+                            <button id="searchBtn" class="search-btn" title="搜索">
+                                <iconify-icon icon="mdi:arrow-right" width="20" height="20"></iconify-icon>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- 右：天气（两地，优先成都郫都） -->
+                <aside class="stage-col stage-right">
+                    <div class="card weather-card">
+                        <div class="wx-block primary">
+                            <div class="wx-block-head">
+                                <iconify-icon icon="mdi:map-marker-outline" width="14" height="14"></iconify-icon>
+                                <span id="wxCity0">成都·郫都</span>
+                                <span class="wx-tag">主要</span>
+                            </div>
+                            <div class="wx-block-body">
+                                <div class="wx-icon" id="wxIcon0"><iconify-icon icon="noto:cloud" width="40" height="40"></iconify-icon></div>
+                                <div class="wx-temp"><span id="wxTemp0">--</span><small>°</small></div>
+                                <div class="wx-meta">
+                                    <div class="wx-desc" id="wxDesc0">加载中…</div>
+                                    <div class="wx-range" id="wxRange0">-- / --</div>
+                                </div>
+                            </div>
+                            <div class="wx-aqi" id="wxAqi0">空气 --</div>
+                        </div>
+
+                        <div class="wx-divider"></div>
+
+                        <div class="wx-block">
+                            <div class="wx-block-head">
+                                <iconify-icon icon="mdi:map-marker-outline" width="14" height="14"></iconify-icon>
+                                <span id="wxCity1">南充·西充</span>
+                            </div>
+                            <div class="wx-block-body">
+                                <div class="wx-icon" id="wxIcon1"><iconify-icon icon="noto:cloud" width="34" height="34"></iconify-icon></div>
+                                <div class="wx-temp"><span id="wxTemp1">--</span><small>°</small></div>
+                                <div class="wx-meta">
+                                    <div class="wx-desc" id="wxDesc1">加载中…</div>
+                                    <div class="wx-range" id="wxRange1">-- / --</div>
+                                </div>
+                            </div>
+                            <div class="wx-aqi" id="wxAqi1">空气 --</div>
+                        </div>
+                    </div>
+
+                    <!-- 音乐播放器（天气下方，与左侧日历等高） -->
+                    <div class="music-player card" id="musicPlayer">
+                        <div class="mp-head">
+                            <div class="mp-cover-wrap" id="mpCoverWrap">
+                                <iconify-icon icon="material-symbols:music-note-rounded" class="mp-cover-ph" width="22" height="22"></iconify-icon>
+                                <img id="mpCover" class="mp-cover" src="" alt="cover">
+                            </div>
+                            <div class="mp-info">
+                                <div class="mp-title" id="mpTitle">未在播放</div>
+                                <div class="mp-artist" id="mpArtist">点击播放</div>
+                            </div>
+                            <button class="mp-playlist-btn" id="mpPlaylistBtn" title="播放列表">
+                                <iconify-icon icon="mdi:playlist-music" width="18" height="18"></iconify-icon>
+                            </button>
+                        </div>
+                        <div class="mp-time">
+                            <span id="mpCurTime">0:00</span>
+                            <div class="mp-progress" id="mpProgress">
+                                <div class="mp-progress-bar" id="mpProgressBar"></div>
+                            </div>
+                            <span id="mpDurTime">0:00</span>
+                        </div>
+                        <div class="mp-controls">
+                            <button class="mp-mode" id="mpMode" title="播放模式：列表循环">
+                                <iconify-icon icon="material-symbols:repeat-rounded" width="18" height="18"></iconify-icon>
+                            </button>
+                            <button class="mp-ctrl" id="mpPrev" title="上一首">
+                                <iconify-icon icon="material-symbols:skip-previous-rounded" width="22" height="22"></iconify-icon>
+                            </button>
+                            <button class="mp-play" id="mpPlay" title="播放/暂停">
+                                <iconify-icon icon="material-symbols:play-arrow-rounded" id="mpPlayIcon" width="24" height="24"></iconify-icon>
+                            </button>
+                            <button class="mp-ctrl" id="mpNext" title="下一首">
+                                <iconify-icon icon="material-symbols:skip-next-rounded" width="22" height="22"></iconify-icon>
+                            </button>
+                            <button class="mp-vol-btn" id="mpMute" title="静音">
+                                <iconify-icon icon="material-symbols:volume-up-rounded" id="mpVolIcon" width="18" height="18"></iconify-icon>
+                            </button>
+                            <input type="range" class="mp-volume" id="mpVolume" min="0" max="100" value="70" title="音量">
+                        </div>
+                        <!-- 播放列表抽屉 -->
+                        <div class="mp-playlist hidden" id="mpPlaylist"></div>
+                    </div>
+                </aside>
+
+            </div>
+
+            <!-- ============ 网站 dock（无标题，一排居中） ============ -->
+            <section class="dock-section">
+                <div class="site-dock" id="siteDock"></div>
+            </section>
+
+            <!-- ============ 页脚（宽屏一排：左运行时间 / 中版权 / 右统计） ============ -->
+            <footer class="footer">
+                <div class="card footer-card">
+                    <div class="footer-left">
+                        <iconify-icon icon="mdi:clock-outline" width="16"></iconify-icon>
+                        <span>本站已运行</span>
+                        <span class="stat-num" id="site_uptime">—</span>
+                    </div>
+                    <div class="footer-center">
+                        Copyright © 2026 <a href="https://yjhup.com" target="_blank" rel="noopener noreferrer">YJH</a>. All rights reserved. | Powered by <a href="https://yjhup.com" target="_blank" rel="noopener noreferrer">YJH</a>
+                    </div>
+                    <div class="footer-right">
+                        <span class="footer-badge">
+                            <iconify-icon icon="mdi:eye-outline" width="15"></iconify-icon>
+                            人次 <span class="stat-num" id="page_pv">—</span>
+                        </span>
+                        <span class="footer-badge">
+                            <iconify-icon icon="mdi:account-outline" width="15"></iconify-icon>
+                            人数 <span class="stat-num" id="page_uv">—</span>
+                        </span>
+                    </div>
+                </div>
+            </footer>
+
+        </div>
+
+        <!-- 右上角工具（主题色 / 壁纸图源 / 换壁纸，随整体淡出） -->
+        <div class="wallpaper-tools">
+            <div class="theme-wrap">
+                <button id="themeBtn" class="tool-btn" title="切换主题色">
+                    <iconify-icon icon="mdi:palette" width="18" height="18"></iconify-icon>
+                </button>
+                <div id="themeMenu" class="theme-menu hidden">
+                    <div class="wp-menu-title">选择主题色</div>
+                    <button class="theme-option" data-theme="amber" title="琥珀（默认）"><span class="theme-swatch" style="background:#fbbf24"></span><span>琥珀</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                    <button class="theme-option" data-theme="blue" title="蔚蓝"><span class="theme-swatch" style="background:#60a5fa"></span><span>蔚蓝</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                    <button class="theme-option" data-theme="green" title="青竹"><span class="theme-swatch" style="background:#34d399"></span><span>青竹</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                    <button class="theme-option" data-theme="purple" title="紫藤"><span class="theme-swatch" style="background:#a78bfa"></span><span>紫藤</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                    <button class="theme-option" data-theme="rose" title="玫红"><span class="theme-swatch" style="background:#fb7185"></span><span>玫红</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                    <button class="theme-option" data-theme="cyan" title="青蓝"><span class="theme-swatch" style="background:#22d3ee"></span><span>青蓝</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                </div>
+            </div>
+            <div class="wp-source-wrap">
+                <button id="wpSourceBtn" class="tool-btn" title="切换壁纸图源">
+                    <iconify-icon icon="material-symbols:wallpaper" width="18" height="18"></iconify-icon>
+                </button>
+                <div id="wpSourceMenu" class="wp-source-menu hidden">
+                    <div class="wp-menu-title">选择壁纸图源</div>
+                    <button class="wp-source-option" data-source="dmoe">
+                        <span class="wp-dot"></span>
+                        <span class="wp-source-name">樱花 DMOE · 二次元</span>
+                        <iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon>
+                    </button>
+                    <button class="wp-source-option" data-source="selfhost">
+                        <span class="wp-dot"></span>
+                        <span class="wp-source-name">自建图库</span>
+                        <iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon>
+                    </button>
+                    <button class="wp-source-option" data-source="mixed">
+                        <span class="wp-dot"></span>
+                        <span class="wp-source-name">两者随机</span>
+                        <iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+            <button id="refreshBgBtn" class="tool-btn" title="换一张壁纸">
+                <iconify-icon icon="material-symbols:refresh" width="18" height="18"></iconify-icon>
+            </button>
+        </div>
+
+    </div>
+
+    <script src="assets/config.js"></script>
+    <script src="assets/script.js"></script>
+</body>
+</html>
