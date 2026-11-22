@@ -20,12 +20,13 @@
      * 增加一个网站：复制一行，改 title / url / icon 即可。
      * 删除一个网站：直接删掉对应行（或行首加 // 注释）。
      * icon 可用任意 Iconify 图标名，如 "mdi:github"、"logos:chrome"；
-     * 留空则自动显示标题首字。desc 为可选副标题。
+     * 也可用 img 指定本地图片路径（如豆包 "assets/icons/doubao.png"）。
+     * icon/img 都留空则显示标题首字。desc 为可选副标题。
      */
     const SITES = [
         { title: "Google", url: "https://www.google.com/", icon: "devicon:google", desc: "" },
         { title: "Gemini", url: "https://gemini.google.com/app", icon: "vscode-icons:file-type-gemini", desc: "" },
-        { title: "豆包", url: "https://www.doubao.com/chat/", icon: "thesvg-color:doubao", desc: "" },
+        { title: "豆包", url: "https://www.doubao.com/chat/", img: "assets/icons/doubao.png", desc: "" },
         { title: "Kimi", url: "https://www.kimi.com/", icon: "hugeicons:kimi-ai", desc: "" },
         { title: "Deepseek", url: "https://chat.deepseek.com/", icon: "logos:deepseek-icon", desc: "" },
         { title: "TikTok", url: "https://www.tiktok.com/", icon: "ic:baseline-tiktok", desc: "" },

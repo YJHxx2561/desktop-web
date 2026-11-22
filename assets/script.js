@@ -37,7 +37,13 @@
 
             const iconWrap = document.createElement('div');
             iconWrap.className = 'site-icon';
-            if (site.icon) {
+            if (site.img) {
+                const img = document.createElement('img');
+                img.className = 'site-img';
+                img.src = site.img;
+                img.alt = site.title;
+                iconWrap.appendChild(img);
+            } else if (site.icon) {
                 const ic = document.createElement('iconify-icon');
                 ic.setAttribute('icon', site.icon);
                 ic.setAttribute('width', '24');
@@ -705,7 +711,9 @@
         function applyMode() {
             const btn = $('mpMode');
             if (btn) {
-                btn.setAttribute('icon', MODE_ICON[mode]);
+                // 图标在按钮内部的 <iconify-icon> 上，必须先找到它再改 icon 属性
+                const ic = btn.querySelector('iconify-icon');
+                if (ic) ic.setAttribute('icon', MODE_ICON[mode]);
                 btn.title = '播放模式：' + MODE_TITLE[mode];
                 btn.classList.toggle('on', mode !== 0);
             }
@@ -750,12 +758,49 @@
                 if (list && !list.contains(e.target) && e.target !== listBtn && !listBtn.contains(e.target)) list.classList.add('hidden');
             });
 
+            // 进度条：支持点击 + 按住拖动（参考 Firefly 的 pointer 事件实现）
             const progress = $('mpProgress');
-            if (progress) progress.addEventListener('click', function (e) {
-                if (!audio.duration) return;
-                const rect = this.getBoundingClientRect();
-                audio.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * audio.duration;
-            });
+            if (progress) {
+                let dragging = false;
+                let dragPercent = 0;
+                function getPercent(e) {
+                    const rect = progress.getBoundingClientRect();
+                    if (!rect.width) return 0;
+                    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                }
+                function paintProgress(pct) {
+                    const bar = $('mpProgressBar');
+                    if (bar) bar.style.width = (pct * 100) + '%';
+                    if (audio.duration) setText('mpCurTime', fmt(pct * audio.duration));
+                }
+                progress.addEventListener('pointerdown', function (e) {
+                    if (e.button !== 0 || !audio.duration) return;
+                    dragging = true;
+                    try { progress.setPointerCapture(e.pointerId); } catch (err) {}
+                    dragPercent = getPercent(e);
+                    paintProgress(dragPercent);
+                    e.preventDefault();
+                });
+                progress.addEventListener('pointermove', function (e) {
+                    if (!dragging) return;
+                    dragPercent = getPercent(e);
+                    paintProgress(dragPercent);
+                });
+                function finishDrag(e) {
+                    if (!dragging) return;
+                    dragging = false;
+                    try { progress.releasePointerCapture(e.pointerId); } catch (err) {}
+                    if (audio.duration) audio.currentTime = dragPercent * audio.duration;
+                }
+                progress.addEventListener('pointerup', finishDrag);
+                progress.addEventListener('pointercancel', function (e) {
+                    if (!dragging) return;
+                    dragging = false;
+                    try { progress.releasePointerCapture(e.pointerId); } catch (err) {}
+                    // 取消时恢复到实际播放位置
+                    if (audio.duration) paintProgress(audio.currentTime / audio.duration);
+                });
+            }
 
             audio.addEventListener('play', updatePlayIcon);
             audio.addEventListener('pause', updatePlayIcon);
@@ -814,6 +859,95 @@
     }
 
     /* ============================================================
+     * 9.5 3D 酷炫跟随光标（渐进增强：支持 3D 且非触屏时启用，否则回退原生光标）
+     *   发光核心点 + 旋转虚线光环(带 3D 倾斜) + 5 段拖尾 + 点击波纹 + 悬停高亮
+     *   参考 my-homepage 的实现，颜色改用本站主题色变量
+     * ============================================================ */
+    function initCursor() {
+        const supports3D = !!(window.CSS && CSS.supports &&
+            CSS.supports('transform', 'perspective(500px) rotateX(10deg)'));
+        const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        if (!supports3D || isTouch) return;
+
+        const fx = $('cursorFx'), halo = $('cursorHalo'), dot = $('cursorDot'), ripple = $('cursorRipple');
+        if (!fx || !halo || !dot) return;
+        const trails = [1, 2, 3, 4, 5].map(i => $('trail' + i)).filter(Boolean);
+        document.body.classList.add('custom-cursor');
+
+        let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+        let hx = mouseX, hy = mouseY;
+        let lastX = mouseX, lastY = mouseY;
+        let vx = 0, vy = 0, spin = 0;
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const pts = trails.map(() => ({ x: mouseX, y: mouseY }));
+
+        document.addEventListener('mousemove', e => {
+            mouseX = e.clientX; mouseY = e.clientY;
+            fx.style.opacity = '1';
+        }, { passive: true });
+        document.addEventListener('mouseleave', () => { fx.style.opacity = '0'; });
+        document.addEventListener('mouseenter', () => { fx.style.opacity = '1'; });
+
+        // 点击波纹
+        let rippleAnim = null;
+        document.addEventListener('mousedown', e => {
+            if (reduce || !ripple) return;
+            if (rippleAnim) cancelAnimationFrame(rippleAnim);
+            const rx = e.clientX, ry = e.clientY;
+            let t = 0;
+            ripple.style.opacity = '0.9';
+            (function step() {
+                t += 0.06;
+                ripple.style.transform = 'translate3d(' + rx + 'px,' + ry + 'px,0) scale(' + (1 + t * 4) + ')';
+                ripple.style.opacity = String(Math.max(0, 0.9 - t * 0.9));
+                if (t < 1) rippleAnim = requestAnimationFrame(step);
+            })();
+        });
+
+        // 悬停在可点击元素上时高亮
+        const interactive = 'a, button, input, .site-card, .wp-source-option, .theme-option, .mp-playlist-item';
+        document.addEventListener('mouseover', e => {
+            if (e.target instanceof Element && e.target.closest(interactive)) document.body.classList.add('hovering');
+        });
+        document.addEventListener('mouseout', e => {
+            if (e.target instanceof Element && e.target.closest(interactive)) document.body.classList.remove('hovering');
+        });
+
+        function render() {
+            const rawVx = mouseX - lastX, rawVy = mouseY - lastY;
+            lastX = mouseX; lastY = mouseY;
+            vx += (rawVx - vx) * 0.15;
+            vy += (rawVy - vy) * 0.15;
+            hx += (mouseX - hx) * 0.16;
+            hy += (mouseY - hy) * 0.16;
+
+            const speed = Math.min(Math.sqrt(vx * vx + vy * vy), 50);
+            const tiltX = reduce ? 0 : Math.max(-35, Math.min(35, -vy * 1.5));
+            const tiltY = reduce ? 0 : Math.max(-35, Math.min(35, vx * 1.5));
+            spin += reduce ? 0 : 0.6 + speed * 0.15;
+            const scale = 1 + speed / 120 + (document.body.classList.contains('hovering') ? 0.3 : 0);
+
+            dot.style.transform = 'translate3d(' + mouseX + 'px,' + mouseY + 'px,0)';
+            halo.style.transform =
+                'translate3d(' + hx + 'px,' + hy + 'px,0) ' +
+                'perspective(520px) rotateX(' + tiltX + 'deg) rotateY(' + tiltY + 'deg) ' +
+                'rotate(' + spin + 'deg) scale(' + scale + ')';
+
+            let tx = mouseX, ty = mouseY;
+            pts.forEach((p, i) => {
+                p.x += (tx - p.x) * 0.32;
+                p.y += (ty - p.y) * 0.32;
+                const k = 1 - i / (pts.length + 1);
+                trails[i].style.transform = 'translate3d(' + p.x + 'px,' + p.y + 'px,0) scale(' + k.toFixed(2) + ')';
+                trails[i].style.opacity = (k * 0.7).toFixed(2);
+                tx = p.x; ty = p.y;
+            });
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+    }
+
+    /* ============================================================
      * 10. 闲置自动淡出（30 秒无操作后所有组件逐渐变淡直至消失，任意操作恢复）
      * ============================================================ */
     function initIdleFade() {
@@ -865,6 +999,7 @@
         music.init();
         initUptime();
         initStats();
+        initCursor();
         initIdleFade();
     }
 
