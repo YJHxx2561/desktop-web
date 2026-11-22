@@ -53,7 +53,7 @@
 | 换壁纸图源 | `WALLPAPER_SOURCES` |
 | 加主题色 | `THEMES` |
 | 换天气城市 | `WEATHER_LOCATIONS`（经纬度可在 Open-Meteo 查询） |
-| 改歌单 | `MUSIC_PLAYLIST`（文件放 `assets/music/`） |
+| 增删音乐 | `MUSIC_SONGS`，每首一行 `song(文件名, 歌名, 歌手)`；mp3 放 `assets/music/`，封面放 `assets/music/cover/`（同名，webp/jpg/png 自动识别） |
 | 改站点起始时间 | `UPTIME_START` |
 | 改统计后端 | `STATS_API` |
 
@@ -125,7 +125,7 @@ npx serve -l 8777
 
 ## 说明
 
-- **音乐资源较大**：`assets/music/` 约 185 MB。如果介意仓库体积，可把音乐上传到对象存储或图床，然后把 `config.js` 中 `MUSIC_PLAYLIST` 的 `url`/`cover` 改成外链，并删除本地音乐目录。
+- **音乐资源较大**：`assets/music/` 约 185 MB。如果介意仓库体积，可把音乐上传到对象存储或图床，然后把 `config.js` 中 `song()` 的文件名改成完整 URL、并用第 4 个参数指定封面外链，再删除本地音乐目录。
 - **访问统计**：使用与 SunPanel 相同的 WebViso 后端（`stats.web.yjhup.com`）。若不想统计，删除 `config.js` 中的 `statsApi` 即可。
 - **天气 / 壁纸**：来自 Open-Meteo、樱花 DMOE 和自建图库，均为公开接口，无需 Key。
 - **浏览器兼容**：使用了 Custom Elements 与 CSS 变量，建议 Chrome / Edge / Firefox / Safari 最新版。

@@ -595,7 +595,60 @@
      * 8. 音乐播放器（参考 Firefly 本地播放方案，UI 与本站适配）
      * ============================================================ */
     const music = (function () {
-        const PLAYLIST = CFG.musicPlaylist || [];
+        // 兼容：优先用新的精简配置（musicSongs），否则回退旧格式（musicPlaylist）
+        const MUSIC_DIR = CFG.musicDir || 'assets/music/';
+        const COVER_DIR = CFG.musicCoverDir || 'assets/music/cover/';
+        const COVER_EXTS = ['webp', 'jpg', 'png', 'jpeg'];
+
+        // 从文件名解析歌名与歌手：去掉序号，按最后一个 "-" 拆分 "歌名-歌手"
+        function parseFileName(file) {
+            let stem = String(file || '').replace(/\.[^.]+$/, ''); // 去扩展名
+            stem = stem.replace(/^\d+\s*[-_.]?\s*/, '');          // 去开头序号
+            const parts = stem.split(/\s+-\s+|\s*[-_]\s*/).filter(Boolean);
+            if (parts.length >= 2) return { name: parts[0], artist: parts.slice(1).join(' ') };
+            return { name: stem || '未命名', artist: '' };
+        }
+
+        // 构建完整曲目：url / cover 自动补全，忽略显式 coverFile 时用同名图片自动探测
+        const PLAYLIST = (function () {
+            if (CFG.musicSongs && CFG.musicSongs.length) {
+                return CFG.musicSongs.map(s => {
+                    const parsed = parseFileName(s.file);
+                    const base = String(s.file).replace(/\.[^.]+$/, '');
+                    const cover = s.coverFile
+                        ? COVER_DIR + s.coverFile
+                        : { candidates: COVER_EXTS.map(ext => COVER_DIR + base + '.' + ext) };
+                    return {
+                        name: s.name || parsed.name,
+                        artist: s.artist || parsed.artist,
+                        url: MUSIC_DIR + s.file,
+                        cover: cover
+                    };
+                });
+            }
+            // 旧格式兼容（url/cover 已是完整路径）
+            return (CFG.musicPlaylist || []).map(s => ({ name: s.name, artist: s.artist, url: s.url, cover: s.cover }));
+        })();
+
+        // 自动探测封面：按候选扩展名依次尝试，找到第一个能加载的（结果缓存）
+        const coverCache = {};
+        function resolveCover(song, cb) {
+            const c = song.cover;
+            if (typeof c === 'string') { cb(c); return; }
+            if (!c || !c.candidates || !c.candidates.length) { cb(''); return; }
+            const key = c.candidates[0];
+            if (coverCache[key] !== undefined) { cb(coverCache[key]); return; }
+            let i = 0;
+            (function next() {
+                if (i >= c.candidates.length) { coverCache[key] = ''; cb(''); return; }
+                const url = c.candidates[i++];
+                const img = new Image();
+                img.onload = () => { coverCache[key] = url; cb(url); };
+                img.onerror = next;
+                img.src = url;
+            })();
+        }
+
         const MODE_ICON = ['material-symbols:repeat-rounded', 'material-symbols:repeat-one-rounded', 'material-symbols:shuffle-rounded'];
         const MODE_TITLE = ['列表循环', '单曲循环', '随机播放'];
 
@@ -642,11 +695,12 @@
             setText('mpArtist', song.artist);
             const cover = $('mpCover');
             const wrap = $('mpCoverWrap');
-            if (cover) {
-                cover.src = song.cover;
-                cover.classList.add('show');
-            }
-            if (wrap) wrap.classList.add('has-cover');
+            const currentIndex = index;
+            resolveCover(song, function (url) {
+                if (currentIndex !== index || !url) return; // 已切歌或无封面则跳过
+                if (cover) { cover.src = url; cover.classList.add('show'); }
+                if (wrap) wrap.classList.add('has-cover');
+            });
             // 更新列表高亮
             document.querySelectorAll('.mp-playlist-item').forEach((el, i) => {
                 el.classList.toggle('active', i === index);
@@ -654,9 +708,10 @@
             // Media Session 元数据
             if ('mediaSession' in navigator && window.MediaMetadata) {
                 try {
-                    navigator.mediaSession.metadata = new MediaMetadata({
-                        title: song.name, artist: song.artist, album: 'Desktop Music',
-                        artwork: [{ src: new URL(song.cover, location.href).href, sizes: '512x512' }]
+                    const meta = { title: song.name, artist: song.artist, album: 'Desktop Music' };
+                    resolveCover(song, function (url) {
+                        if (url) meta.artwork = [{ src: new URL(url, location.href).href, sizes: '512x512' }];
+                        navigator.mediaSession.metadata = new MediaMetadata(meta);
                     });
                 } catch (e) {}
             }
@@ -826,15 +881,42 @@
     const THEMES = CFG.themes || {};
     function initTheme() {
         let theme = store.get('theme', 'amber');
-        if (!THEMES[theme]) theme = 'amber';
+        let customColor = store.get('theme-custom-color', '#fbbf24');
+        if (theme !== 'custom' && !THEMES[theme]) theme = 'amber';
+
+        // 十六进制 → RGB 字符串，如 #fbbf24 → "251, 191, 36"
+        function hexToRgb(hex) {
+            const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+            return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)].join(', ') : null;
+        }
+        // 加深颜色（用于渐变深色端）
+        function darken(hex, ratio) {
+            const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+            if (!m) return '#000000';
+            const c = [m[1], m[2], m[3]].map(h => Math.round(parseInt(h, 16) * (1 - ratio)).toString(16).padStart(2, '0'));
+            return '#' + c.join('');
+        }
+
         function apply() {
-            const t = THEMES[theme];
             const root = document.documentElement;
-            root.style.setProperty('--accent-rgb', t.rgb);
-            root.style.setProperty('--accent-2', t.second);
+            if (theme === 'custom') {
+                const rgb = hexToRgb(customColor);
+                if (rgb) {
+                    root.style.setProperty('--accent-rgb', rgb);
+                    root.style.setProperty('--accent-2', darken(customColor, 0.25));
+                }
+            } else {
+                const t = THEMES[theme];
+                root.style.setProperty('--accent-rgb', t.rgb);
+                root.style.setProperty('--accent-2', t.second);
+            }
             document.querySelectorAll('.theme-option').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-theme') === theme);
             });
+            const customLabel = document.querySelector('.theme-custom');
+            if (customLabel) customLabel.classList.toggle('active', theme === 'custom');
+            const colorInput = $('themeColorInput');
+            if (colorInput && /^#[0-9a-f]{6}$/i.test(customColor)) colorInput.value = customColor;
         }
         apply();
 
@@ -853,6 +935,23 @@
                 if (menu) menu.classList.add('hidden');
             });
         });
+        // 自定义颜色：input 事件实时预览，change 事件持久化
+        const colorInput = $('themeColorInput');
+        if (colorInput) {
+            colorInput.addEventListener('input', function () {
+                theme = 'custom';
+                customColor = this.value;
+                apply();
+            });
+            colorInput.addEventListener('change', function () {
+                store.set('theme', 'custom');
+                store.set('theme-custom-color', this.value);
+            });
+            // 点击颜色框/标签不关闭菜单
+            colorInput.addEventListener('click', e => e.stopPropagation());
+            const customLabel = document.querySelector('.theme-custom');
+            if (customLabel) customLabel.addEventListener('click', e => e.stopPropagation());
+        }
         document.addEventListener('click', function () {
             if (menu) menu.classList.add('hidden');
         });
@@ -956,6 +1055,8 @@
         let timer = null, hidden = false, fading = false;
         function show() {
             if (fading) { clearInterval(window.__fadeIv); fading = false; }
+            // 恢复组件时同步恢复壁纸遮罩（壁纸回到变暗状态，保证文字可读）
+            document.body.classList.remove('idle');
             if (hidden || layer.style.opacity !== '' && layer.style.opacity !== '1') {
                 layer.style.opacity = '1';
                 layer.style.pointerEvents = '';
@@ -966,6 +1067,8 @@
             show();
             if (timer) clearTimeout(timer);
             timer = setTimeout(() => {
+                // 开始淡出时移除遮罩，让壁纸随组件一起逐渐恢复原有亮度
+                document.body.classList.add('idle');
                 let op = 1;
                 fading = true;
                 window.__fadeIv = setInterval(() => {

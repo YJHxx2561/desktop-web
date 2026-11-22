@@ -42,7 +42,10 @@ body {
 .wallpaper-overlay {
     position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: linear-gradient(160deg, rgba(10,12,30,.34) 0%, rgba(12,18,38,.5) 55%, rgba(8,10,26,.66) 100%);
+    transition: opacity 0.9s ease;
 }
+/* 闲置淡出时移除遮罩，让壁纸恢复原有亮度 */
+body.idle .wallpaper-overlay { opacity: 0; }
 
 /* ---------- 淡出图层 / 主体 ---------- */
 #fadeLayer { transition: opacity 0.9s ease; }
@@ -323,6 +326,21 @@ body {
 .theme-swatch { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(255,255,255,.25); }
 .theme-check { color: var(--accent); visibility: hidden; margin-left: auto; }
 .theme-option.active .theme-check { visibility: visible; }
+.theme-divider { height: 1px; background: var(--glass-border); margin: 6px 2px; }
+.theme-custom {
+    display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px;
+    border-radius: 8px; color: var(--text-dim); font-size: 12.5px; cursor: pointer;
+    transition: background .15s;
+}
+.theme-custom:hover { background: rgba(255,255,255,.1); color: #fff; }
+.theme-custom input[type="color"] {
+    width: 18px; height: 18px; flex: none; padding: 0; border: 1px solid rgba(255,255,255,.3);
+    border-radius: 50%; background: none; cursor: pointer; overflow: hidden;
+}
+.theme-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.theme-custom input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+.theme-custom.active .theme-check { visibility: visible; color: var(--accent); }
+.theme-custom .theme-check { visibility: hidden; margin-left: auto; }
 
 .wp-source-wrap { position: relative; }
 .wp-source-menu {

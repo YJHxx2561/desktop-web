@@ -85,28 +85,41 @@
         { key: '1', name: '南充·西充', lat: 31.0556, lon: 106.0028 }
     ];
 
-    /* ---------- 歌单（本地文件位于 assets/music/） ---------- */
-    const MUSIC_PLAYLIST = [
-        { name: '使一颗心免于哀伤', artist: '知更鸟 / HOYO-MiX', url: 'assets/music/01-使一颗心免于哀伤-知更鸟.mp3', cover: 'assets/music/cover/01-使一颗心免于哀伤-知更鸟.webp' },
-        { name: '在银河中孤独摇摆', artist: '知更鸟 / HOYO-MiX', url: 'assets/music/02-在银河中孤独摇摆-知更鸟.mp3', cover: 'assets/music/cover/02-在银河中孤独摇摆-知更鸟.webp' },
-        { name: '希望有羽毛和翅膀', artist: '知更鸟 / HOYO-MiX', url: 'assets/music/03-希望有羽毛和翅膀-知更鸟.mp3', cover: 'assets/music/cover/03-希望有羽毛和翅膀-知更鸟.webp' },
-        { name: '玻璃', artist: 'Gareth.T', url: 'assets/music/04-玻璃-Gareth.T.mp3', cover: 'assets/music/cover/04-玻璃-Gareth.T.webp' },
-        { name: 'Take me hand', artist: 'DAISHI DANCE & Cécile Corbel', url: 'assets/music/05-Take-me-hand-DAISHI-DANCE.mp3', cover: 'assets/music/cover/05-Take-me-hand-DAISHI-DANCE.jpg' },
-        { name: '九张机', artist: '叶炫清', url: 'assets/music/06-九张机-叶炫清.mp3', cover: 'assets/music/cover/06-九张机-叶炫清.jpg' },
-        { name: '失控', artist: '井迪儿', url: 'assets/music/07-失控-井迪儿.mp3', cover: 'assets/music/cover/07-失控-井迪儿.webp' },
-        { name: '想你时风起', artist: '单依纯', url: 'assets/music/08-想你时风起-单依纯.mp3', cover: 'assets/music/cover/08-想你时风起-单依纯.webp' },
-        { name: '叹云兮', artist: '鞠婧祎', url: 'assets/music/09-叹云兮-鞠婧祎.mp3', cover: 'assets/music/cover/09-叹云兮-鞠婧祎.jpg' },
-        { name: '知我', artist: '国风堂, 哦漏', url: 'assets/music/10-知我-国风堂.mp3', cover: 'assets/music/cover/10-知我-国风堂.jpg' },
-        { name: '如果突然想起我', artist: '喵酱油 & 花玲', url: 'assets/music/11-如果突然想起我-喵酱油.mp3', cover: 'assets/music/cover/11-如果突然想起我-喵酱油.jpg' },
-        { name: '我不难过', artist: '孙燕姿', url: 'assets/music/12-我不难过-孙燕姿.mp3', cover: 'assets/music/cover/12-我不难过-孙燕姿.jpg' },
-        { name: '心似烟火', artist: '陈壹千', url: 'assets/music/13-心似烟火-陈壹千.mp3', cover: 'assets/music/cover/13-心似烟火-陈壹千.jpg' },
-        { name: '吹梦到西洲', artist: '恋恋故人难、黄诗扶、妖扬', url: 'assets/music/14-吹梦到西洲-恋恋故人难.mp3', cover: 'assets/music/cover/14-吹梦到西洲-恋恋故人难.webp' },
-        { name: '昔涟', artist: '张韶涵 & HOYO-MiX', url: 'assets/music/15-昔涟-张韶涵.mp3', cover: 'assets/music/cover/15-昔涟-张韶涵.jpg' },
-        { name: '雨爱', artist: '杨丞琳', url: 'assets/music/16-雨爱-杨丞琳.mp3', cover: 'assets/music/cover/16-雨爱-杨丞琳.webp' },
-        { name: '离开我的依赖', artist: '王艳薇', url: 'assets/music/17-离开我的依赖-王艳薇.mp3', cover: 'assets/music/cover/17-离开我的依赖-王艳薇.jpg' },
-        { name: '我不曾忘记', artist: '花玲 & 张安琪 & 沐霏', url: 'assets/music/18-我不曾忘记-花玲.mp3', cover: 'assets/music/cover/18-我不曾忘记-花玲.webp' },
-        { name: '让风告诉你', artist: '花玲 & 喵酱油 & 宴宁', url: 'assets/music/19-让风告诉你-花玲.mp3', cover: 'assets/music/cover/19-让风告诉你-花玲.jpg' },
-        { name: '此生不换', artist: '青鸟飞鱼', url: 'assets/music/20-此生不换-青鸟飞鱼.mp3', cover: 'assets/music/cover/20-此生不换-青鸟飞鱼.webp' }
+    /* ---------- 音乐 ----------
+     * 【增删音乐只需改这里，每首一行】
+     *   song(文件名, 歌曲名, 歌手)
+     *   · 文件名：放在 assets/music/ 下的 mp3 名（如 '01-歌名-歌手.mp3'）
+     *   · 歌曲名/歌手：可选，省略时会自动从文件名解析
+     *   · 封面：自动按同名文件在 assets/music/cover/ 下查找（支持 webp/jpg/png/jpeg），
+     *     也可传第 4 个参数手动指定封面文件名
+     * 删除一首歌：删掉/注释掉对应那一行即可。
+     */
+    const MUSIC_DIR = 'assets/music/';
+    const MUSIC_COVER_DIR = 'assets/music/cover/';
+    function song(file, name, artist, coverFile) {
+        return { file: file, name: name, artist: artist, coverFile: coverFile || '' };
+    }
+    const MUSIC_SONGS = [
+        song('01-使一颗心免于哀伤-知更鸟.mp3', '使一颗心免于哀伤', '知更鸟 / HOYO-MiX'),
+        song('02-在银河中孤独摇摆-知更鸟.mp3', '在银河中孤独摇摆', '知更鸟 / HOYO-MiX'),
+        song('03-希望有羽毛和翅膀-知更鸟.mp3', '希望有羽毛和翅膀', '知更鸟 / HOYO-MiX'),
+        song('04-玻璃-Gareth.T.mp3', '玻璃', 'Gareth.T'),
+        song('05-Take-me-hand-DAISHI-DANCE.mp3', 'Take me hand', 'DAISHI DANCE & Cécile Corbel'),
+        song('06-九张机-叶炫清.mp3', '九张机', '叶炫清'),
+        song('07-失控-井迪儿.mp3', '失控', '井迪儿'),
+        song('08-想你时风起-单依纯.mp3', '想你时风起', '单依纯'),
+        song('09-叹云兮-鞠婧祎.mp3', '叹云兮', '鞠婧祎'),
+        song('10-知我-国风堂.mp3', '知我', '国风堂, 哦漏'),
+        song('11-如果突然想起我-喵酱油.mp3', '如果突然想起我', '喵酱油 & 花玲'),
+        song('12-我不难过-孙燕姿.mp3', '我不难过', '孙燕姿'),
+        song('13-心似烟火-陈壹千.mp3', '心似烟火', '陈壹千'),
+        song('14-吹梦到西洲-恋恋故人难.mp3', '吹梦到西洲', '恋恋故人难、黄诗扶、妖扬'),
+        song('15-昔涟-张韶涵.mp3', '昔涟', '张韶涵 & HOYO-MiX'),
+        song('16-雨爱-杨丞琳.mp3', '雨爱', '杨丞琳'),
+        song('17-离开我的依赖-王艳薇.mp3', '离开我的依赖', '王艳薇'),
+        song('18-我不曾忘记-花玲.mp3', '我不曾忘记', '花玲 & 张安琪 & 沐霏'),
+        song('19-让风告诉你-花玲.mp3', '让风告诉你', '花玲 & 喵酱油 & 宴宁'),
+        song('20-此生不换-青鸟飞鱼.mp3', '此生不换', '青鸟飞鱼')
     ];
 
     /* ---------- 访问统计（与 SunPanel 相同的 WebViso 后端） ---------- */
@@ -121,7 +134,9 @@
         wallpaperSources: WALLPAPER_SOURCES,
         themes: THEMES,
         weatherLocations: WEATHER_LOCATIONS,
-        musicPlaylist: MUSIC_PLAYLIST,
+        musicDir: MUSIC_DIR,
+        musicCoverDir: MUSIC_COVER_DIR,
+        musicSongs: MUSIC_SONGS,
         statsApi: STATS_API,
         uptimeStart: UPTIME_START
     };
