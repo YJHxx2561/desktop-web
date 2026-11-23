@@ -61,12 +61,12 @@
     };
 
     /* ---------- 壁纸图源 ----------
-     * 程序按屏幕宽高比自动为「自建图库」选择 landscape/portrait。
+     * 程序按屏幕宽高比自动为「作者自建随机图」选择 landscape/portrait。
      * mixed = 在 dmoe 与 selfhost 之间随机。
      */
     const WALLPAPER_SOURCES = {
         dmoe:     { name: '樱花 DMOE · 二次元', url: 'https://www.dmoe.cc/random.php' },
-        selfhost: { name: '自建图库', url: 'https://static-imgapi.web.yjhup.com/api/' },
+        selfhost: { name: '作者自建随机图', url: 'https://static-imgapi.web.yjhup.com/api/' },
         mixed:    { name: '两者随机', url: '' },
         custom:   { name: '自定义图源', url: '' } // API 地址由用户在页面上输入，保存在浏览器端
     };
@@ -181,6 +181,12 @@
     const MUSIC_CDN_BASE = 'https://musicfiles.yjh-web.eu.cc';
     const MUSIC_CDN_TIMEOUT = 3000;
 
+    /* ---------- 封面加载策略 ----------
+     * 本地封面（assets/music/cover/）优先；本地静态资源在 5s 内仍未加载完成，
+     * 则放弃本地、改用 R2 上的同名封面文件。
+     */
+    const MUSIC_COVER_TIMEOUT = 5000;
+
     /* ---------- 访问统计（与 SunPanel 相同的 WebViso 后端） ---------- */
     const STATS_API = 'https://stats.web.yjhup.com/api/visit';
 
@@ -198,6 +204,7 @@
         musicSongs: MUSIC_SONGS,
         musicCdnBase: MUSIC_CDN_BASE,
         musicCdnTimeout: MUSIC_CDN_TIMEOUT,
+        musicCoverTimeout: MUSIC_COVER_TIMEOUT,
         statsApi: STATS_API,
         uptimeStart: UPTIME_START
     };

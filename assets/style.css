@@ -77,28 +77,36 @@ body.idle .wallpaper-overlay { opacity: 0; }
 }
 .stage-col { display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; }
 .stage-left { justify-content: stretch; }
-/* 中间列上移，使"晚上好"与右上角工具按钮处于同一高度（按钮中心约 36px） */
+/* 中间列：自然布局，居中不受右上角工具按钮位置影响 */
 .stage-center {
     justify-content: flex-start;
-    transform: translateY(calc(23px - clamp(60px, 6.5vh, 76px)));
 }
 .stage-right { gap: 12px; }
 .stage-right .weather-card { flex: 1 1 auto; }
 
 /* ---------- 模拟表盘 + 数字时钟（公历在左、农历在右） ---------- */
 .hero { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.clock-row { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 1.6vw, 26px); }
+/* 左右等宽：保证表盘在两个断点之间也始终真正居中 */
+.clock-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center; gap: clamp(10px, 1.6vw, 26px);
+    width: 100%;
+}
 .clock-side {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    min-width: 118px; text-shadow: 0 2px 10px rgba(0,0,0,.5);
+    min-width: 0; text-shadow: 0 2px 10px rgba(0,0,0,.5);
 }
+.clock-side.side-left { justify-self: end; }
+.clock-side.side-right { justify-self: start; }
 .side-label {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 11px; letter-spacing: 2px; color: var(--accent); margin-bottom: 8px;
+    font-size: 11px; letter-spacing: 2px; color: var(--accent); margin-bottom: 6px;
 }
 .side-label iconify-icon { opacity: .9; }
 .side-main { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.35; white-space: nowrap; }
-.side-sub { margin-top: 6px; font-size: 12px; color: var(--text-dim); line-height: 1.3; max-width: 150px; }
+.side-sub { margin-top: 3px; font-size: 12px; color: var(--text-dim); line-height: 1.3; }
+/* 保持表盘自身不被 grid 拉伸 */
 .clock-widget {
     position: relative; width: 196px; height: 196px;
     display: flex; align-items: center; justify-content: center;
@@ -126,10 +134,10 @@ body.idle .wallpaper-overlay { opacity: 0; }
     position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
     border-radius: 50%; background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.8); z-index: 2;
 }
+/* 数字时钟：不再有圆形衬底，仅文字叠在表盘中央 */
 .clock-digital {
-    position: relative; z-index: 3; width: 130px; height: 130px; border-radius: 50%;
+    position: relative; z-index: 3; width: 130px; height: 130px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: radial-gradient(circle, rgba(20,24,44,.86) 0%, rgba(20,24,44,.72) 70%, rgba(20,24,44,0) 100%);
 }
 .clock-time {
     font-size: 30px; font-weight: 700; letter-spacing: 1px; line-height: 1.05;
@@ -309,8 +317,11 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .footer-badge iconify-icon { color: var(--accent); }
 .stat-num { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 2px; }
 
-/* ---------- 壁纸工具 ---------- */
-.wallpaper-tools { position: fixed; right: 16px; top: 16px; z-index: 60; display: flex; align-items: flex-start; gap: 8px; }
+/* ---------- 右上角工具（固定于整个页面最右上角，位于淡出图层之外） ---------- */
+.wallpaper-tools {
+    position: fixed; right: 14px; top: 14px; z-index: 60;
+    display: flex; align-items: center; gap: 8px;
+}
 .tool-btn {
     width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
     border-radius: 12px; border: 1px solid var(--glass-border);
@@ -318,8 +329,67 @@ body.idle .wallpaper-overlay { opacity: 0; }
     color: var(--text-dim); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.25); transition: all .2s;
 }
 .tool-btn:hover { background: rgba(60,62,82,.72); color: #fff; transform: translateY(-2px); }
+/* 设置按钮：主题色描边 + 高亮，视觉上作为右上角主入口 */
+.tool-btn-primary {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb),.42);
+    background: rgba(var(--accent-rgb),.14);
+    box-shadow: 0 6px 18px rgba(0,0,0,.25), 0 0 0 3px rgba(var(--accent-rgb),.08);
+}
+.tool-btn-primary:hover {
+    color: #fff;
+    background: rgba(var(--accent-rgb),.28);
+    border-color: rgba(var(--accent-rgb),.7);
+}
 .tool-btn.loading iconify-icon { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- 统一设置面板 ---------- */
+.settings-panel {
+    position: fixed; right: 14px; top: 62px; z-index: 61;
+    width: 280px; max-height: calc(100vh - 80px); overflow-y: auto;
+    padding: 12px; border-radius: 14px;
+    background: rgba(30,32,48,.97); backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border); box-shadow: var(--shadow);
+}
+.settings-panel.hidden { display: none; }
+.settings-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; padding: 0 2px 8px; border-bottom: 1px solid var(--glass-border);
+    font-size: 14px; font-weight: 600; color: var(--text);
+}
+.settings-head span { display: inline-flex; align-items: center; gap: 7px; }
+.settings-head iconify-icon { color: var(--accent); }
+.settings-close { border: none; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; padding: 2px; }
+.settings-close:hover { color: #fff; }
+.settings-section { padding: 4px 0 10px; border-bottom: 1px solid var(--glass-border); }
+.settings-section:last-child { border-bottom: none; }
+.settings-section .wp-menu-title { padding: 6px 4px; font-size: 11.5px; color: var(--text-faint); font-weight: 600; }
+/* 主题色两列网格 */
+.theme-swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.theme-swatches .theme-option { padding: 7px 8px; font-size: 12px; }
+/* 调色盘：覆盖在面板内 */
+.settings-panel .color-picker { position: static; width: 100%; padding: 4px 0 0; border: none; background: transparent; box-shadow: none; }
+/* 天气城市设置 */
+.wx-city-slot { padding: 2px 0 6px; }
+.wx-city-row { display: flex; align-items: center; gap: 6px; }
+.wx-city-input { flex: 1; }
+.wx-city-current { padding: 4px 2px 0; font-size: 10.5px; color: var(--text-dim); }
+.wx-city-results { margin-top: 6px; border: 1px solid var(--glass-border); border-radius: 8px; overflow: hidden; }
+.wx-city-results.hidden { display: none; }
+.wx-city-result {
+    display: block; width: 100%; padding: 7px 9px; text-align: left;
+    border: none; border-bottom: 1px solid var(--glass-border); background: rgba(255,255,255,.04);
+    color: var(--text-dim); font-size: 11.5px; cursor: pointer;
+}
+.wx-city-result:last-child { border-bottom: none; }
+.wx-city-result:hover { background: var(--accent-soft); color: var(--accent); }
+.wx-city-reset {
+    width: 100%; margin-top: 4px; padding: 7px; border-radius: 8px;
+    border: 1px solid var(--glass-border); background: rgba(255,255,255,.05);
+    color: var(--text-dim); font-size: 11.5px; cursor: pointer;
+}
+.wx-city-reset:hover { background: rgba(255,255,255,.12); color: #fff; }
 /* 主题色下拉 */
 .theme-wrap { position: relative; }
 .theme-menu {
@@ -533,7 +603,8 @@ body.idle .wallpaper-overlay { opacity: 0; }
     position: relative; z-index: 20;
     width: 100%; max-width: 330px; padding: 12px 14px 11px;
     border-color: rgba(var(--accent-rgb),.22);
-    background: rgba(28,30,46,.6);
+    /* 与其他卡片保持一致的玻璃透明度 */
+    background: var(--card-bg);
 }
 .mp-head { display: flex; align-items: center; gap: 10px; }
 .mp-cover-wrap {
@@ -688,23 +759,39 @@ body.custom-cursor.hovering .cursor-halo {
     .site-card iconify-icon { width: 22px; height: 22px; }
     .site-title { font-size: 10px; }
 }
-/* 中等宽度：三栏收紧 */
-@media (max-width: 1180px) {
-    .stage { grid-template-columns: minmax(260px,320px) minmax(300px,1fr) minmax(260px,320px); gap: 14px; }
-    .clock-side { min-width: 96px; }
-    .side-main { font-size: 14px; }
+/* 中等宽度：三栏收紧（缩小两侧卡片，把空间让给中间时钟，避免日期文字压到两侧卡片） */
+@media (max-width: 1280px) {
+    .stage { grid-template-columns: minmax(0, 280px) minmax(0, 1fr) minmax(0, 280px); gap: 12px; }
+    .clock-widget { width: 168px; height: 168px; }
+    .clock-digital { width: 112px; height: 112px; }
+    .clock-time { font-size: 25px; }
+    .dial-hand.hour { height: 39px; }
+    .dial-hand.minute { height: 54px; }
+    .dial-hand.second { height: 61px; }
+    .side-main { font-size: 12px; white-space: normal; line-height: 1.25; }
+    .side-label { font-size: 10.5px; }
+    .side-sub { font-size: 11px; }
     .footer-card { grid-template-columns: 1fr auto; row-gap: 8px; }
     .footer-left { grid-column: 1; }
     .footer-right { grid-column: 2; grid-row: 1; }
     .footer-center { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
 }
-/* 窄屏：改为纵向堆叠（时钟搜索优先，其次日历、天气） */
+@media (max-width: 1040px) {
+    .stage { grid-template-columns: minmax(0, 250px) minmax(0, 1fr) minmax(0, 250px); gap: 10px; }
+    .clock-widget { width: 152px; height: 152px; }
+    .clock-digital { width: 100px; height: 100px; }
+    .clock-time { font-size: 22px; }
+    .dial-hand.hour { height: 35px; }
+    .dial-hand.minute { height: 48px; }
+    .dial-hand.second { height: 55px; }
+}
+/* 窄屏：改为纵向堆叠（时钟搜索优先，其次日历、天气），各卡片水平居中 */
 @media (max-width: 900px) {
     .page-content { justify-content: flex-start; min-height: auto; padding-top: 62px; }
-    .stage { display: flex; flex-direction: column; gap: 18px; }
+    .stage { display: flex; flex-direction: column; align-items: center; gap: 18px; }
     .stage-center { order: 1; width: 100%; transform: none; }
-    .stage-left { order: 2; width: 100%; }
-    .stage-right { order: 3; width: 100%; }
+    .stage-left { order: 2; width: 100%; align-items: center; }
+    .stage-right { order: 3; width: 100%; align-items: center; }
     .weather-card, .calendar-card { max-width: 460px; }
     .footer-card { grid-template-columns: 1fr; text-align: center; row-gap: 10px; }
     .footer-left, .footer-right, .footer-center { grid-column: 1; grid-row: auto; justify-self: center; }
@@ -712,14 +799,13 @@ body.custom-cursor.hovering .cursor-halo {
     .wallpaper-tools { top: 12px; right: 12px; }
 }
 @media (max-width: 640px) {
-    /* 手机上把公历/农历移到时钟两侧但整体收紧，避免左右裁切 */
+    /* 窄屏：公历/农历仍在表盘两侧，栅格三列随表盘收缩，保持水平居中 */
     .page-content { padding-top: 76px; padding-left: 12px; padding-right: 12px; }
-    .clock-row { width: 100%; gap: 4px; justify-content: space-between; }
-    .clock-side { min-width: 0; flex: 1 1 0; }
-    .side-label { font-size: 10px; letter-spacing: 1px; gap: 2px; margin-bottom: 5px; }
+    .clock-row { width: 100%; gap: 4px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+    .side-label { font-size: 10px; letter-spacing: 1px; gap: 2px; margin-bottom: 4px; }
     .side-main { font-size: 12px; white-space: normal; line-height: 1.25; }
-    .side-sub { font-size: 10.5px; margin-top: 4px; max-width: none; }
-    .clock-widget { width: 150px; height: 150px; flex: none; }
+    .side-sub { font-size: 10.5px; margin-top: 3px; }
+    .clock-widget { width: 150px; height: 150px; }
     .clock-digital { width: 100px; height: 100px; }
     .clock-time { font-size: 23px; }
     .clock-ampm { font-size: 10px; }
@@ -735,6 +821,7 @@ body.custom-cursor.hovering .cursor-halo {
     /* 工具按钮下移并缩紧，避免遮挡日期 */
     .wallpaper-tools { top: 10px; right: 10px; gap: 6px; }
     .tool-btn { width: 36px; height: 36px; }
+    .settings-panel { top: 52px; right: 10px; width: min(280px, calc(100vw - 20px)); max-height: calc(100vh - 64px); }
 }
 @media (max-width: 420px) {
     .clock-widget { width: 132px; height: 132px; }

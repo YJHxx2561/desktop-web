@@ -18,16 +18,58 @@
     };
 
     const $ = id => document.getElementById(id);
+    const $$ = (sel, root) => Array.prototype.slice.call((root || document).querySelectorAll(sel));
+    const pad = n => String(n).padStart(2, '0');
+    // 统一写文本：元素不存在时静默跳过，避免模块里反复判空
+    function setText(id, txt) { const el = $(id); if (el) el.textContent = txt; }
+    // 统一 fetch JSON：非 2xx 视为失败，供天气/统计复用
+    function fetchJson(url, options) {
+        return fetch(url, options).then(r => {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.json();
+        });
+    }
+    // 生成带随机参数的 URL，避免图片 API 缓存（壁纸/封面共用逻辑）
+    function withBust(url) {
+        const sep = url.indexOf('?') === -1 ? '?' : '&';
+        return url + sep + 't=' + Date.now() + '&r=' + Math.random().toString(36).slice(2);
+    }
 
-    // 下拉菜单互斥：打开一个时自动关闭其它工具下拉框
-    const DROPDOWN_IDS = ['themeMenu', 'wpSourceMenu', 'autoWpMenu', 'colorPicker'];
+    // 顶层下拉：只有统一设置面板；调色盘作为面板内子视图
+    // 全局「点击空白处关闭面板」只注册一次（此前在壁纸/主题里各注册了三次）
+    const DROPDOWN_IDS = ['settingsPanel'];
     function closeDropdowns(except) {
         DROPDOWN_IDS.forEach(id => {
             const el = $(id);
             if (el && id !== except) el.classList.add('hidden');
         });
     }
-    const pad = n => String(n).padStart(2, '0');
+    document.addEventListener('click', function () { closeDropdowns(); });
+    // 设置面板开关
+    function initSettingsPanel() {
+        const btn = $('settingsBtn'), panel = $('settingsPanel'), close = $('settingsClose');
+        if (!btn || !panel) return;
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const willOpen = panel.classList.contains('hidden');
+            if (willOpen) {
+                closeDropdowns('settingsPanel');
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('hidden');
+                // 关闭时若在调色盘子视图，回到主面板，避免下次打开停留在子视图
+                const body = panel.querySelector('.settings-body');
+                const picker = $('colorPicker');
+                if (body) body.classList.remove('hidden');
+                if (picker) picker.classList.add('hidden');
+            }
+        });
+        if (close) close.addEventListener('click', function (e) {
+            e.stopPropagation();
+            panel.classList.add('hidden');
+        });
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
 
     /* ============================================================
      * 1. 网站 dock 渲染
@@ -88,6 +130,14 @@
     const clock = (function () {
         let hour12 = store.get('clock-hour12', '0') === '1';
         const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+        // 元素引用只查一次；农历日期/节日一天才变一次，缓存后避免每帧重算
+        const el = {
+            time: $('clockTime'), ampm: $('clockAmPm'), greet: $('clockGreet'),
+            date: $('clockDate'), week: $('clockWeek'), lunar: $('clockLunar'), festival: $('clockFestival'),
+            sec: $('handSecond'), min: $('handMinute'), hour: $('handHour')
+        };
+        let lastSecond = -1, lastDayKey = '';
+        const dayKey = now => now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
 
         function buildTicks() {
             const wrap = $('dialTicks');
@@ -138,53 +188,55 @@
             return '夜深了';
         }
 
-        function renderDigital(now) {
+        // 每秒更新的数字时钟与问候语
+        function renderTime(now) {
             let h = now.getHours();
             let ampm = '';
             if (hour12) {
                 ampm = h < 12 ? 'AM' : 'PM';
-                h = h % 12; if (h === 0) h = 12;
+                h = h % 12 || 12;
             }
-            const timeEl = $('clockTime');
-            if (timeEl) timeEl.textContent = pad(h) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-            const ampmEl = $('clockAmPm');
-            if (ampmEl) ampmEl.textContent = ampm;
-            const greetEl = $('clockGreet');
-            if (greetEl) greetEl.textContent = greeting(now.getHours());
-            const dateEl = $('clockDate');
-            if (dateEl) dateEl.textContent = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
-            const weekEl = $('clockWeek');
-            if (weekEl) weekEl.textContent = '星期' + WEEK[now.getDay()];
-            const lunarEl = $('clockLunar');
-            const festivalEl = $('clockFestival');
-            if (lunarEl || festivalEl) {
+            if (el.time) el.time.textContent = pad(h) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+            if (el.ampm) el.ampm.textContent = ampm;
+            if (el.greet) el.greet.textContent = greeting(now.getHours());
+        }
+
+        // 每天更新一次的日期与农历（Solar 计算较重，不能放进每帧循环）
+        function renderDate(now) {
+            if (el.date) el.date.textContent = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+            if (el.week) el.week.textContent = '星期' + WEEK[now.getDay()];
+            if (el.lunar || el.festival) {
                 const parts = lunarParts(now);
-                if (lunarEl) lunarEl.textContent = parts.lunar;
-                if (festivalEl) festivalEl.textContent = parts.festival;
+                if (el.lunar) el.lunar.textContent = parts.lunar;
+                if (el.festival) el.festival.textContent = parts.festival;
             }
         }
 
         function tick() {
             const now = new Date();
-            const ms = now.getMilliseconds();
-            const s = now.getSeconds() + ms / 1000;
+            // 指针平滑扫秒：每帧更新（唯一需要 60fps 的部分）
+            const s = now.getSeconds() + now.getMilliseconds() / 1000;
             const m = now.getMinutes() + s / 60;
             const h = (now.getHours() % 12) + m / 60;
-            const hs = $('handSecond'), hm = $('handMinute'), hh = $('handHour');
-            if (hs) hs.style.transform = 'rotate(' + (s * 6) + 'deg)';
-            if (hm) hm.style.transform = 'rotate(' + (m * 6) + 'deg)';
-            if (hh) hh.style.transform = 'rotate(' + (h * 30) + 'deg)';
-            renderDigital(now);
+            if (el.sec) el.sec.style.transform = 'rotate(' + (s * 6) + 'deg)';
+            if (el.min) el.min.style.transform = 'rotate(' + (m * 6) + 'deg)';
+            if (el.hour) el.hour.style.transform = 'rotate(' + (h * 30) + 'deg)';
+            // 文本只在秒变化时更新；日期/农历只在跨天时更新，大幅降低开销
+            if (now.getSeconds() !== lastSecond) {
+                renderTime(now);
+                lastSecond = now.getSeconds();
+                const key = dayKey(now);
+                if (key !== lastDayKey) { renderDate(now); lastDayKey = key; }
+            }
             requestAnimationFrame(tick);
         }
 
         function bindToggle() {
-            const el = $('clockTime');
-            if (!el) return;
-            el.addEventListener('click', function () {
+            if (!el.time) return;
+            el.time.addEventListener('click', function () {
                 hour12 = !hour12;
                 store.set('clock-hour12', hour12 ? '1' : '0');
-                renderDigital(new Date());
+                renderTime(new Date());
             });
         }
 
@@ -205,15 +257,15 @@
         const input = $('searchInput');
         const dropdown = $('engineDropdown');
         const engineIcon = $('engineIcon');
+        const engineOptions = $$('.engine-option');
 
         function applyEngine(key) {
             engine = key;
             store.set('search-engine', key);
             if (engineIcon) engineIcon.setAttribute('icon', SEARCH_ENGINES[key].icon);
-            if (input) input.placeholder = '使用 ' + key.charAt(0).toUpperCase() + key.slice(1) + ' 搜索，或直接按回车……';
-            document.querySelectorAll('.engine-option').forEach(btn => {
-                btn.classList.toggle('active', btn.getAttribute('data-engine') === key);
-            });
+            const label = key.charAt(0).toUpperCase() + key.slice(1);
+            if (input) input.placeholder = '使用 ' + label + ' 搜索，或直接按回车……';
+            engineOptions.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-engine') === key));
         }
 
         function doSearch() {
@@ -228,7 +280,7 @@
             if (dropdown) dropdown.classList.toggle('hidden');
         });
 
-        document.querySelectorAll('.engine-option').forEach(option => {
+        engineOptions.forEach(option => {
             option.addEventListener('click', function (e) {
                 e.stopPropagation();
                 applyEngine(this.getAttribute('data-engine'));
@@ -273,16 +325,12 @@
 
         function buildUrl() {
             // 自定义图源：直接返回图片地址，附加随机参数避免缓存
-            if (source === 'custom' && customApi) {
-                const sep = customApi.indexOf('?') === -1 ? '?' : '&';
-                return customApi + sep + 't=' + Date.now() + '&r=' + Math.random().toString(36).slice(2);
-            }
-            // 第三个选项：在樱花 DMOE 与自建图库之间随机挑一个
+            if (source === 'custom' && customApi) return withBust(customApi);
+            // mixed：在樱花 DMOE 与作者自建随机图之间随机挑一个
             let chosen = source;
             if (source === 'mixed') chosen = Math.random() < 0.5 ? 'dmoe' : 'selfhost';
             const base = chosen === 'dmoe' ? WALLPAPER_SOURCES.dmoe.url : selfhostBase();
-            const sep = base.indexOf('?') === -1 ? '?' : '&';
-            return base + sep + 't=' + Date.now() + '&r=' + Math.random().toString(36).slice(2);
+            return withBust(base);
         }
 
         // 双层交叉淡入淡出：新图在备用层加载完成后淡入，再交换主/备层
@@ -318,14 +366,12 @@
 
         // ---- 自动换背景 ----
         function updateAutoUI() {
-            const btn = $('autoWpBtn');
             const toggle = $('autoWpEnabled');
             const input = $('autoWpInterval');
             const status = $('autoWpStatus');
-            if (btn) btn.classList.toggle('on', autoEnabled);
             if (toggle) toggle.checked = autoEnabled;
             if (input) input.value = autoInterval;
-            document.querySelectorAll('.auto-wp-preset').forEach(b => {
+            $$('.auto-wp-preset').forEach(b => {
                 b.classList.toggle('active', parseInt(b.getAttribute('data-sec'), 10) === autoInterval);
             });
             if (status) {
@@ -363,20 +409,10 @@
             updateAutoUI();
             scheduleAuto();
 
-            const btn = $('autoWpBtn');
-            const menu = $('autoWpMenu');
-            if (btn) btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const willOpen = menu && menu.classList.contains('hidden');
-                closeDropdowns(willOpen ? 'autoWpMenu' : null);
-                if (menu) menu.classList.toggle('hidden');
-            });
-            if (menu) menu.addEventListener('click', e => e.stopPropagation());
-
             const toggle = $('autoWpEnabled');
             if (toggle) toggle.addEventListener('change', function () { setAutoEnabled(this.checked); });
 
-            document.querySelectorAll('.auto-wp-preset').forEach(b => {
+            $$('.auto-wp-preset').forEach(b => {
                 b.addEventListener('click', function () {
                     setAutoInterval(parseInt(this.getAttribute('data-sec'), 10));
                 });
@@ -394,14 +430,10 @@
                 e.stopPropagation();
                 setAutoInterval(Math.max(5, autoInterval - 5));
             });
-
-            document.addEventListener('click', function () {
-                closeDropdowns();
-            });
         }
 
         function applySourceMenu() {
-            document.querySelectorAll('.wp-source-option').forEach(btn => {
+            $$('.wp-source-option').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-source') === source);
             });
             // 选中自定义时展开 API 输入框并回填已保存地址
@@ -419,15 +451,7 @@
             const refreshBtn = $('refreshBgBtn');
             if (refreshBtn) refreshBtn.addEventListener('click', load);
 
-            const srcBtn = $('wpSourceBtn');
-            const menu = $('wpSourceMenu');
-            if (srcBtn) srcBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const willOpen = menu && menu.classList.contains('hidden');
-                closeDropdowns(willOpen ? 'wpSourceMenu' : null);
-                if (menu) menu.classList.toggle('hidden');
-            });
-            document.querySelectorAll('.wp-source-option').forEach(btn => {
+            $$('.wp-source-option').forEach(btn => {
                 btn.addEventListener('click', function (e) {
                     e.stopPropagation();
                     const picked = this.getAttribute('data-source');
@@ -443,7 +467,6 @@
                     source = picked;
                     store.set('wallpaper-source', source);
                     applySourceMenu();
-                    if (menu) menu.classList.add('hidden');
                     load();
                 });
             });
@@ -465,7 +488,6 @@
                 source = 'custom';
                 store.set('wallpaper-source', source);
                 applySourceMenu();
-                if (menu) menu.classList.add('hidden');
                 load();
             }
             if (apiSave) apiSave.addEventListener('click', function (e) {
@@ -481,10 +503,6 @@
             }
             const apiBox = $('wpCustomApi');
             if (apiBox) apiBox.addEventListener('click', e => e.stopPropagation());
-
-            document.addEventListener('click', function () {
-                closeDropdowns();
-            });
         }
 
         return { init: init };
@@ -495,7 +513,20 @@
      *    固定两地：① 成都郫都（主要，优先展示）② 四川西充
      * ============================================================ */
     const weather = (function () {
-        const LOCATIONS = CFG.weatherLocations || [];
+        // 城市：默认来自 config，用户在设置中自定义后存 localStorage（键 weather-locations）
+        const DEFAULT_LOCATIONS = (CFG.weatherLocations || []).map(l => ({ ...l }));
+        const LOC_STORE_KEY = 'weather-locations';
+        function loadLocations() {
+            try {
+                const raw = JSON.parse(localStorage.getItem(LOC_STORE_KEY) || 'null');
+                if (Array.isArray(raw) && raw.length === DEFAULT_LOCATIONS.length &&
+                    raw.every(l => l && typeof l.lat === 'number' && typeof l.lon === 'number' && l.name)) {
+                    return raw;
+                }
+            } catch (e) {}
+            return DEFAULT_LOCATIONS.map(l => ({ ...l }));
+        }
+        let LOCATIONS = loadLocations();
         const CODE_MAP = {
             0: ['晴', 'noto:sun'], 1: ['大致晴朗', 'noto:sun-behind-small-cloud'],
             2: ['局部多云', 'noto:sun-behind-small-cloud'], 3: ['阴', 'noto:cloud'],
@@ -510,8 +541,6 @@
             95: ['雷雨', 'noto:cloud-with-lightning'], 96: ['雷雨伴冰雹', 'noto:cloud-with-lightning-and-rain'], 99: ['强雷雨伴冰雹', 'noto:cloud-with-lightning-and-rain']
         };
         function codeInfo(c) { return CODE_MAP[c] || ['未知', 'noto:cloud']; }
-        function setText(id, txt) { const el = $(id); if (el) el.textContent = txt; }
-        function json(url) { return fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }); }
 
         function aqiInfo(aqi) {
             if (aqi == null) return '空气 —';
@@ -531,7 +560,7 @@
 
             setText('wxCity' + k, loc.name);
 
-            json(wxUrl).then(j => {
+            fetchJson(wxUrl).then(j => {
                 const cur = j && j.current;
                 if (cur) {
                     const info = codeInfo(cur.weather_code);
@@ -545,7 +574,7 @@
                 }
             }).catch(() => { setText('wxDesc' + k, '天气获取失败'); });
 
-            json(aqUrl).then(j => {
+            fetchJson(aqUrl).then(j => {
                 setText('wxAqi' + k, aqiInfo(j && j.current ? j.current.us_aqi : null));
             }).catch(() => {});
         }
@@ -555,7 +584,85 @@
             // 30 分钟刷新一次
             setInterval(function () { LOCATIONS.forEach(fetchWeather); }, 30 * 60 * 1000);
         }
-        return { init: init };
+
+        // ---------- 天气城市自定义 ----------
+        function updateCityLabels() {
+            LOCATIONS.forEach(function (loc, i) {
+                setText('wxCity' + i, loc.name);
+                const cur = $('wxCityCurrent' + i);
+                if (cur) cur.textContent = '当前：' + loc.name + '（' + Number(loc.lat).toFixed(2) + ', ' + Number(loc.lon).toFixed(2) + '）';
+            });
+        }
+        function applyLocations(locs) {
+            LOCATIONS = locs;
+            store.set(LOC_STORE_KEY, JSON.stringify(LOCATIONS));
+            updateCityLabels();
+            LOCATIONS.forEach(fetchWeather); // 立即用新城市刷新
+        }
+        // Open-Meteo geocoding：按名称搜索城市（中文支持）
+        function searchCity(name) {
+            const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' +
+                encodeURIComponent(name) + '&count=6&language=zh&format=json';
+            return fetchJson(url);
+        }
+        function initCitySettings() {
+            updateCityLabels();
+            $$('.wx-city-search').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const slot = parseInt(this.getAttribute('data-slot'), 10);
+                    const input = $('wxCityInput' + slot);
+                    const box = $('wxCityResults' + slot);
+                    if (!input || !box) return;
+                    const name = input.value.trim();
+                    if (!name) { box.textContent = '请输入城市名'; box.classList.remove('hidden'); return; }
+                    box.textContent = '搜索中…'; box.classList.remove('hidden');
+                    searchCity(name).then(function (j) {
+                        const list = (j && j.results) || [];
+                        box.innerHTML = '';
+                        if (!list.length) { box.textContent = '未找到，换个关键词试试'; return; }
+                        list.forEach(function (r) {
+                            const b = document.createElement('button');
+                            b.type = 'button';
+                            b.className = 'wx-city-result';
+                            const region = [r.admin1, r.country].filter(Boolean).join(' · ');
+                            b.textContent = (r.name || '') + (region ? '（' + region + '）' : '');
+                            b.addEventListener('click', function (ev) {
+                                ev.stopPropagation();
+                                const locs = LOCATIONS.map(l => ({ ...l }));
+                                locs[slot] = {
+                                    key: String(slot),
+                                    name: r.name || name,
+                                    lat: r.latitude,
+                                    lon: r.longitude
+                                };
+                                applyLocations(locs);
+                                box.classList.add('hidden');
+                            });
+                            box.appendChild(b);
+                        });
+                    }).catch(function () { box.textContent = '搜索失败，请检查网络'; });
+                });
+            });
+            // 输入框回车触发搜索
+            $$('.wx-city-input').forEach(function (input) {
+                input.addEventListener('keydown', function (e) {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') {
+                        const slot = input.id.replace('wxCityInput', '');
+                        const btn = document.querySelector('.wx-city-search[data-slot="' + slot + '"]');
+                        if (btn) btn.click();
+                    }
+                });
+                input.addEventListener('click', e => e.stopPropagation());
+            });
+            const reset = $('wxCityReset');
+            if (reset) reset.addEventListener('click', function (e) {
+                e.stopPropagation();
+                applyLocations(DEFAULT_LOCATIONS.map(l => ({ ...l })));
+            });
+        }
+        return { init: init, initCitySettings: initCitySettings };
     })();
 
     /* ============================================================
@@ -567,29 +674,24 @@
         viewYear = today.getFullYear();
         viewMonth = today.getMonth();
 
-        function lunarText(y, m, d) {
+        // 一次 Solar 计算同时得到农历文案与是否节日（原来每个格子算两遍）
+        function dayInfo(y, m, d) {
+            if (typeof Solar === 'undefined') return { text: '', festival: false };
             try {
-                if (typeof Solar === 'undefined') return '';
                 const solar = Solar.fromYmd(y, m, d);
                 const lunar = solar.getLunar();
-                // 公历节日 > 农历节日 > 节气 > 农历日
                 const sf = solar.getFestivals() || [];
                 const lf = lunar.getFestivals() || [];
                 const jq = lunar.getJieQi() || '';
-                if (sf.length) return sf[0];
-                if (lf.length) return lf[0];
-                if (jq) return jq;
-                return lunar.getDayInChinese() === '初一' ? lunar.getMonthInChinese() + '月' : lunar.getDayInChinese();
-            } catch (e) { return ''; }
-        }
-
-        function isFestival(y, m, d) {
-            try {
-                if (typeof Solar === 'undefined') return false;
-                const solar = Solar.fromYmd(y, m, d);
-                const lunar = solar.getLunar();
-                return !!((solar.getFestivals() || []).length || (lunar.getFestivals() || []).length || lunar.getJieQi());
-            } catch (e) { return false; }
+                return {
+                    festival: !!(sf.length || lf.length || jq),
+                    // 公历节日 > 农历节日 > 节气 > 农历日
+                    text: sf.length ? sf[0]
+                        : lf.length ? lf[0]
+                        : jq ? jq
+                        : (lunar.getDayInChinese() === '初一' ? lunar.getMonthInChinese() + '月' : lunar.getDayInChinese())
+                };
+            } catch (e) { return { text: '', festival: false }; }
         }
 
         function isoWeek(date) {
@@ -626,8 +728,9 @@
                 const dow = new Date(y, m, d).getDay();
                 if (other) cell.classList.add('other');
                 if (dow === 0 || dow === 6) cell.classList.add('weekend');
-                const festival = !other && isFestival(y, m, d);
-                if (festival) cell.classList.add('festival');
+                // 单个格子只计算一次农历信息
+                const info = other ? null : dayInfo(y, m, d);
+                if (info && info.festival) cell.classList.add('festival');
                 if (!other && y === today.getFullYear() && m === today.getMonth() && d === today.getDate()) cell.classList.add('today');
 
                 const num = document.createElement('div');
@@ -637,7 +740,7 @@
 
                 const lunar = document.createElement('div');
                 lunar.className = 'cal-lunar';
-                lunar.textContent = other ? '' : lunarText(y, m, d);
+                lunar.textContent = info ? info.text : '';
                 cell.appendChild(lunar);
 
                 grid.appendChild(cell);
@@ -792,12 +895,15 @@
                 return CFG.musicSongs.map(s => {
                     const parsed = parseFileName(s.file);
                     const base = String(s.file).replace(/\.[^.]+$/, '');
-                    // 封面候选：先本地，再 R2（同名文件）
+                    // 封面候选分两组：本地静态资源 / R2 远端（同名文件）
                     const localCovers = COVER_EXTS.map(ext => COVER_DIR + base + '.' + ext);
                     const cdnCovers = CDN_BASE ? localCovers.map(cdnUrl) : [];
                     const cover = s.coverFile
-                        ? { candidates: [COVER_DIR + s.coverFile].concat(CDN_BASE ? [cdnUrl(COVER_DIR + s.coverFile)] : []) }
-                        : { candidates: localCovers.concat(cdnCovers) };
+                        ? {
+                            local: [COVER_DIR + s.coverFile],
+                            remote: CDN_BASE ? [cdnUrl(COVER_DIR + s.coverFile)] : []
+                        }
+                        : { local: localCovers, remote: cdnCovers };
                     return {
                         name: s.name || parsed.name,
                         artist: s.artist || parsed.artist,
@@ -810,23 +916,87 @@
             return (CFG.musicPlaylist || []).map(s => ({ name: s.name, artist: s.artist, url: s.url, cover: s.cover }));
         })();
 
-        // 自动探测封面：按候选依次尝试（本地 → R2），找到第一个能加载的（结果缓存）
-        const coverCache = {};
+        /* 封面加载策略
+         *  1) 优先本地静态资源（assets/music/cover/…），按 webp→jpg→png→jpeg 依次尝试；
+         *  2) 本地 5s 内仍未加载完成（慢速/卡住）→ 放弃本地，改用 R2 远端；
+         *  3) 本地明确 404 时立即切 R2，不浪费等待时间。
+         * 结果按曲目缓存；并发请求共享同一次探测，避免重复下载。
+         */
+        const COVER_LOCAL_TIMEOUT = parseInt(CFG.musicCoverTimeout, 10) || 5000;
+        const coverCache = {};    // key -> 成功 URL（'' 表示无封面）
+        const coverPending = {};  // key -> 等待中的回调队列
+
+        function isRemoteUrl(u) { return /^https?:\/\//i.test(String(u || '')); }
+
         function resolveCover(song, cb) {
             const c = song.cover;
             if (typeof c === 'string') { cb(c); return; }
-            if (!c || !c.candidates || !c.candidates.length) { cb(''); return; }
-            const key = c.candidates[0];
+            if (!c) { cb(''); return; }
+
+            // 兼容两种结构：{local, remote} 与旧版 {candidates}
+            let local = [], remote = [];
+            if (Array.isArray(c.local) || Array.isArray(c.remote)) {
+                local = c.local || [];
+                remote = c.remote || [];
+            } else if (Array.isArray(c.candidates)) {
+                c.candidates.forEach(u => { (isRemoteUrl(u) ? remote : local).push(u); });
+            }
+            if (!local.length && !remote.length) { cb(''); return; }
+
+            const key = local[0] || remote[0];
             if (coverCache[key] !== undefined) { cb(coverCache[key]); return; }
-            let i = 0;
-            (function next() {
-                if (i >= c.candidates.length) { coverCache[key] = ''; cb(''); return; }
-                const url = c.candidates[i++];
+            // 同一首曲子并发调用时共享探测结果
+            if (coverPending[key]) { coverPending[key].push(cb); return; }
+            coverPending[key] = [cb];
+
+            function finish(url) {
+                coverCache[key] = url;
+                const list = coverPending[key] || [];
+                delete coverPending[key];
+                list.forEach(fn => { try { fn(url); } catch (e) {} });
+            }
+
+            let settled = false;
+            let timer = null;
+            function done(url) {
+                if (settled) return;
+                settled = true;
+                if (timer) { clearTimeout(timer); timer = null; }
+                finish(url);
+            }
+
+            // 阶段二：R2 远端
+            let ri = 0;
+            function tryRemote() {
+                if (settled) return;
+                if (ri >= remote.length) { done(''); return; }
+                const url = remote[ri++];
                 const img = new Image();
-                img.onload = () => { coverCache[key] = url; cb(url); };
-                img.onerror = next;
+                img.onload = () => done(url);
+                img.onerror = () => { if (!settled) tryRemote(); };
                 img.src = url;
-            })();
+            }
+
+            // 阶段一：本地静态资源
+            let li = 0;
+            function tryLocal() {
+                if (settled) return;
+                if (li >= local.length) { tryRemote(); return; }
+                const url = local[li++];
+                const img = new Image();
+                img.onload = () => done(url);
+                // 本地文件不存在（404）→ 立刻换下一个候选/转 R2，不空等
+                img.onerror = () => { if (!settled) tryLocal(); };
+                img.src = url;
+            }
+
+            if (local.length) {
+                // 本地 5s 预算：超时仍未出图 → 切 R2
+                timer = setTimeout(() => { if (!settled) tryRemote(); }, COVER_LOCAL_TIMEOUT);
+                tryLocal();
+            } else {
+                tryRemote();
+            }
         }
 
         const MODE_ICON = ['material-symbols:repeat-rounded', 'material-symbols:repeat-one-rounded', 'material-symbols:shuffle-rounded'];
@@ -845,7 +1015,6 @@
             const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
             return m + ':' + (s < 10 ? '0' : '') + s;
         }
-        function setText(id, txt) { const el = $(id); if (el) el.textContent = txt; }
 
         function renderList() {
             const box = $('mpPlaylist');
@@ -889,7 +1058,7 @@
                 if (wrap) wrap.classList.add('has-cover');
             });
             // 更新列表高亮
-            document.querySelectorAll('.mp-playlist-item').forEach((el, i) => {
+            $$('.mp-playlist-item').forEach((el, i) => {
                 el.classList.toggle('active', i === index);
             });
             // Media Session 元数据
@@ -1162,17 +1331,20 @@
         let customColor = store.get('theme-custom-color', '#fbbf24');
         if (theme !== 'custom' && !THEMES[theme]) theme = 'amber';
 
-        // 十六进制 → RGB 字符串，如 #fbbf24 → "251, 191, 36"
-        function hexToRgb(hex) {
+        // 统一解析 #RRGGBB → [r,g,b]（0-255），供 rgb / 加深 / HSV 转换共用
+        function hexToTriplet(hex) {
             const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-            return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)].join(', ') : null;
+            return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
+        }
+        function hexToRgb(hex) {
+            const c = hexToTriplet(hex);
+            return c ? c.join(', ') : null;
         }
         // 加深颜色（用于渐变深色端）
         function darken(hex, ratio) {
-            const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-            if (!m) return '#000000';
-            const c = [m[1], m[2], m[3]].map(h => Math.round(parseInt(h, 16) * (1 - ratio)).toString(16).padStart(2, '0'));
-            return '#' + c.join('');
+            const c = hexToTriplet(hex);
+            if (!c) return '#000000';
+            return '#' + c.map(v => Math.round(v * (1 - ratio)).toString(16).padStart(2, '0')).join('');
         }
 
         function apply() {
@@ -1188,7 +1360,7 @@
                 root.style.setProperty('--accent-rgb', t.rgb);
                 root.style.setProperty('--accent-2', t.second);
             }
-            document.querySelectorAll('.theme-option').forEach(btn => {
+            $$('.theme-option').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-theme') === theme);
             });
             const customLabel = $('themeCustomBtn');
@@ -1198,21 +1370,13 @@
         }
         apply();
 
-        const btn = $('themeBtn');
-        const menu = $('themeMenu');
-        if (btn) btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const willOpen = menu && menu.classList.contains('hidden');
-            closeDropdowns(willOpen ? 'themeMenu' : null);
-            if (menu) menu.classList.toggle('hidden');
-        });
-        document.querySelectorAll('.theme-option').forEach(option => {
+        const panel = $('settingsPanel');
+        $$('.theme-option').forEach(option => {
             option.addEventListener('click', function (e) {
                 e.stopPropagation();
                 theme = this.getAttribute('data-theme');
                 store.set('theme', theme);
                 apply();
-                if (menu) menu.classList.add('hidden');
             });
         });
         // ---------- 自定义调色盘（主题风格，替代浏览器原生取色器） ----------
@@ -1233,9 +1397,9 @@
             return '#' + (to2(r) + to2(g) + to2(b)).toUpperCase();
         }
         function hexToHsv(hex) {
-            const m6 = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-            if (!m6) return null;
-            const r = parseInt(m6[1], 16) / 255, g = parseInt(m6[2], 16) / 255, b = parseInt(m6[3], 16) / 255;
+            const triplet = hexToTriplet(hex);
+            if (!triplet) return null;
+            const r = triplet[0] / 255, g = triplet[1] / 255, b = triplet[2] / 255;
             const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
             let hh = 0;
             if (d) {
@@ -1267,8 +1431,8 @@
             // 打开调色盘（关闭主题菜单，互斥其它下拉框）
             customBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                closeDropdowns('colorPicker');
-                if (menu) menu.classList.add('hidden');
+                const body = panel ? panel.querySelector('.settings-body') : null;
+                if (body) body.classList.add('hidden');
                 picker.classList.remove('hidden');
                 initHsvFromHex(customColor);
             });
@@ -1277,7 +1441,8 @@
             if (back) back.addEventListener('click', function (e) {
                 e.stopPropagation();
                 picker.classList.add('hidden');
-                if (menu) menu.classList.remove('hidden');
+                const body = panel ? panel.querySelector('.settings-body') : null;
+                if (body) body.classList.remove('hidden');
             });
             picker.addEventListener('click', e => e.stopPropagation());
 
@@ -1334,10 +1499,6 @@
                 picker.classList.add('hidden');
             });
         }
-
-        document.addEventListener('click', function () {
-            closeDropdowns();
-        });
     }
 
     /* ============================================================
@@ -1355,6 +1516,8 @@
         if (!fx || !halo || !dot) return;
         const trails = [1, 2, 3, 4, 5].map(i => $('trail' + i)).filter(Boolean);
         document.body.classList.add('custom-cursor');
+        // 初始即显示自定义光标（此前要等首次 mousemove 才 visible，容易被误认为"光标消失"）
+        fx.style.opacity = '1';
 
         let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
         let hx = mouseX, hy = mouseY;
@@ -1435,9 +1598,9 @@
     function initIdleFade() {
         const layer = $('fadeLayer') || $('pageContent');
         if (!layer) return;
-        let timer = null, hidden = false, fading = false;
+        let timer = null, fadeInterval = null, hidden = false;
         function show() {
-            if (fading) { clearInterval(window.__fadeIv); fading = false; }
+            if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
             // 恢复组件时同步恢复壁纸遮罩（壁纸回到变暗状态，保证文字可读）
             document.body.classList.remove('idle');
             if (hidden || layer.style.opacity !== '' && layer.style.opacity !== '1') {
@@ -1450,15 +1613,14 @@
             show();
             if (timer) clearTimeout(timer);
             timer = setTimeout(() => {
-                // 开始淡出时移除遮罩，让壁纸随组件一起逐渐恢复原有亮度
+                // 开始淡出时移除遮罩，让壁纸随组件一起恢复原有亮度
                 document.body.classList.add('idle');
                 let op = 1;
-                fading = true;
-                window.__fadeIv = setInterval(() => {
+                fadeInterval = setInterval(() => {
                     op -= 0.05;
                     if (op <= 0) {
-                        op = 0; clearInterval(window.__fadeIv);
-                        fading = false; hidden = true;
+                        op = 0; clearInterval(fadeInterval); fadeInterval = null;
+                        hidden = true;
                         layer.style.pointerEvents = 'none'; // 淡出后不拦截壁纸交互
                     }
                     layer.style.opacity = op;
@@ -1487,6 +1649,8 @@
         initStats();
         initCursor();
         initIdleFade();
+        initSettingsPanel();
+        weather.initCitySettings();
     }
 
     if (document.readyState === 'loading') {

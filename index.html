@@ -129,7 +129,6 @@
                             <div class="wx-block-head">
                                 <iconify-icon icon="mdi:map-marker-outline" width="14" height="14"></iconify-icon>
                                 <span id="wxCity0">成都·郫都</span>
-                                <span class="wx-tag">主要</span>
                             </div>
                             <div class="wx-block-body">
                                 <div class="wx-icon" id="wxIcon0"><iconify-icon icon="noto:cloud" width="40" height="40"></iconify-icon></div>
@@ -243,21 +242,34 @@
 
         </div>
 
-        <!-- 右上角工具（主题色 / 壁纸图源 / 换壁纸，随整体淡出） -->
-        <div class="wallpaper-tools">
-            <div class="theme-wrap">
-                <button id="themeBtn" class="tool-btn" title="切换主题色">
-                    <iconify-icon icon="mdi:palette" width="18" height="18"></iconify-icon>
-                </button>
-                <div id="themeMenu" class="theme-menu hidden">
-                    <div class="wp-menu-title">选择主题色</div>
-                    <button class="theme-option" data-theme="amber" title="琥珀（默认）"><span class="theme-swatch" style="background:#fbbf24"></span><span>琥珀</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
-                    <button class="theme-option" data-theme="blue" title="蔚蓝"><span class="theme-swatch" style="background:#60a5fa"></span><span>蔚蓝</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
-                    <button class="theme-option" data-theme="green" title="青竹"><span class="theme-swatch" style="background:#34d399"></span><span>青竹</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
-                    <button class="theme-option" data-theme="purple" title="紫藤"><span class="theme-swatch" style="background:#a78bfa"></span><span>紫藤</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
-                    <button class="theme-option" data-theme="rose" title="玫红"><span class="theme-swatch" style="background:#fb7185"></span><span>玫红</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
-                    <button class="theme-option" data-theme="cyan" title="青蓝"><span class="theme-swatch" style="background:#22d3ee"></span><span>青蓝</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
-                    <div class="theme-divider"></div>
+    <!-- 右上角工具：随整体淡出 -->
+    <div class="wallpaper-tools">
+        <button id="refreshBgBtn" class="tool-btn" title="换一张壁纸">
+            <iconify-icon icon="mdi:refresh" width="19" height="19"></iconify-icon>
+        </button>
+        <button id="settingsBtn" class="tool-btn tool-btn-primary" title="设置">
+            <iconify-icon icon="mdi:tune-variant" width="19" height="19"></iconify-icon>
+        </button>
+    </div>
+
+        <!-- 统一设置面板 -->
+        <div id="settingsPanel" class="settings-panel hidden">
+            <div class="settings-head">
+                <span><iconify-icon icon="mdi:cog-outline" width="16" height="16"></iconify-icon> 设置</span>
+                <button class="settings-close" id="settingsClose" title="关闭"><iconify-icon icon="mdi:close" width="16" height="16"></iconify-icon></button>
+            </div>
+            <div class="settings-body">
+                <!-- 主题色 -->
+                <div id="themeMenu" class="settings-section">
+                    <div class="wp-menu-title">主题色</div>
+                    <div class="theme-swatches">
+                        <button class="theme-option" data-theme="amber" title="琥珀"><span class="theme-swatch" style="background:#fbbf24"></span><span>琥珀</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                        <button class="theme-option" data-theme="blue" title="蔚蓝"><span class="theme-swatch" style="background:#60a5fa"></span><span>蔚蓝</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                        <button class="theme-option" data-theme="green" title="青竹"><span class="theme-swatch" style="background:#34d399"></span><span>青竹</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                        <button class="theme-option" data-theme="purple" title="紫藤"><span class="theme-swatch" style="background:#a78bfa"></span><span>紫藤</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                        <button class="theme-option" data-theme="rose" title="玫红"><span class="theme-swatch" style="background:#fb7185"></span><span>玫红</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                        <button class="theme-option" data-theme="cyan" title="青蓝"><span class="theme-swatch" style="background:#22d3ee"></span><span>青蓝</span><iconify-icon icon="mdi:check" class="theme-check" width="15" height="15"></iconify-icon></button>
+                    </div>
                     <button class="theme-custom" id="themeCustomBtn" title="自定义任意颜色">
                         <span class="theme-swatch" id="customColorSwatch" style="background:#fbbf24"></span>
                         <span>自定义颜色</span>
@@ -265,66 +277,22 @@
                         <iconify-icon icon="mdi:check" class="theme-check" id="themeCustomCheck" width="15" height="15"></iconify-icon>
                     </button>
                 </div>
-                <!-- 自定义调色盘（主题风格，替代浏览器原生取色器） -->
-                <div id="colorPicker" class="color-picker hidden">
-                    <div class="cp-head">
-                        <button class="cp-back" id="cpBack" title="返回"><iconify-icon icon="mdi:chevron-left" width="16" height="16"></iconify-icon></button>
-                        <span>自定义颜色</span>
-                    </div>
-                    <div class="cp-sv" id="cpSV">
-                        <div class="cp-sv-white"></div>
-                        <div class="cp-sv-black"></div>
-                        <div class="cp-sv-cursor" id="cpSVCursor"></div>
-                    </div>
-                    <div class="cp-hue-row">
-                        <input type="range" id="cpHue" class="cp-hue" min="0" max="360" value="45">
-                    </div>
-                    <div class="cp-preview-row">
-                        <span class="cp-preview" id="cpPreview"></span>
-                        <span class="cp-hex-label">HEX</span>
-                        <input type="text" id="cpHex" class="cp-hex" value="#FBBF24" maxlength="7" spellcheck="false">
-                    </div>
-                    <div class="cp-quick" id="cpQuick"></div>
-                    <button class="cp-apply" id="cpApply">应用颜色</button>
-                </div>
-            </div>
-            <div class="wp-source-wrap">
-                <button id="wpSourceBtn" class="tool-btn" title="切换壁纸图源">
-                    <iconify-icon icon="material-symbols:wallpaper" width="18" height="18"></iconify-icon>
-                </button>
-                <div id="wpSourceMenu" class="wp-source-menu hidden">
-                    <div class="wp-menu-title">选择壁纸图源</div>
-                    <button class="wp-source-option" data-source="dmoe">
-                        <span class="wp-dot"></span>
-                        <span class="wp-source-name">樱花 DMOE · 二次元</span>
-                        <iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon>
-                    </button>
-                    <button class="wp-source-option" data-source="selfhost">
-                        <span class="wp-dot"></span>
-                        <span class="wp-source-name">自建图库</span>
-                        <iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon>
-                    </button>
-                    <button class="wp-source-option" data-source="mixed">
-                        <span class="wp-dot"></span>
-                        <span class="wp-source-name">两者随机</span>
-                        <iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon>
-                    </button>
-                    <button class="wp-source-option" data-source="custom">
-                        <span class="wp-dot"></span>
-                        <span class="wp-source-name">自定义图源</span>
-                        <iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon>
-                    </button>
+
+                <!-- 壁纸图源 -->
+                <div id="wpSourceMenu" class="settings-section">
+                    <div class="wp-menu-title">壁纸图源</div>
+                    <button class="wp-source-option" data-source="dmoe"><span class="wp-dot"></span><span class="wp-source-name">樱花 DMOE · 二次元</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
+                    <button class="wp-source-option" data-source="selfhost"><span class="wp-dot"></span><span class="wp-source-name">作者自建随机图</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
+                    <button class="wp-source-option" data-source="mixed"><span class="wp-dot"></span><span class="wp-source-name">两者随机</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
+                    <button class="wp-source-option" data-source="custom"><span class="wp-dot"></span><span class="wp-source-name">自定义图源</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
                     <div class="wp-custom-api" id="wpCustomApi">
                         <input type="text" id="wpCustomApiInput" class="wp-api-input" placeholder="输入图片 API 地址" spellcheck="false">
                         <button type="button" class="wp-api-save" id="wpCustomApiSave" title="保存图源"><iconify-icon icon="mdi:check" width="14" height="14"></iconify-icon></button>
                     </div>
                 </div>
-            </div>
-            <div class="auto-wp-wrap">
-                <button id="autoWpBtn" class="tool-btn" title="自动更换背景">
-                    <iconify-icon icon="mdi:timer-outline" width="18" height="18"></iconify-icon>
-                </button>
-                <div id="autoWpMenu" class="auto-wp-menu hidden">
+
+                <!-- 自动换背景 -->
+                <div id="autoWpMenu" class="settings-section">
                     <div class="wp-menu-title">自动更换背景</div>
                     <label class="auto-wp-toggle">
                         <span>启用自动更换</span>
@@ -349,10 +317,46 @@
                     </div>
                     <div class="auto-wp-status" id="autoWpStatus">已关闭</div>
                 </div>
+
+                <!-- 天气城市 -->
+                <div id="weatherCityMenu" class="settings-section">
+                    <div class="wp-menu-title">天气城市（默认：成都·郫都 / 南充·西充）</div>
+                    <div class="wx-city-slot" data-slot="0">
+                        <div class="wx-city-row">
+                            <input type="text" class="wp-api-input wx-city-input" id="wxCityInput0" placeholder="搜索城市，如 成都" spellcheck="false">
+                            <button type="button" class="wp-api-save wx-city-search" data-slot="0" title="搜索城市"><iconify-icon icon="mdi:magnify" width="14" height="14"></iconify-icon></button>
+                        </div>
+                        <div class="wx-city-current" id="wxCityCurrent0"></div>
+                        <div class="wx-city-results hidden" id="wxCityResults0"></div>
+                    </div>
+                    <div class="wx-city-slot" data-slot="1">
+                        <div class="wx-city-row">
+                            <input type="text" class="wp-api-input wx-city-input" id="wxCityInput1" placeholder="搜索城市，如 西充" spellcheck="false">
+                            <button type="button" class="wp-api-save wx-city-search" data-slot="1" title="搜索城市"><iconify-icon icon="mdi:magnify" width="14" height="14"></iconify-icon></button>
+                        </div>
+                        <div class="wx-city-current" id="wxCityCurrent1"></div>
+                        <div class="wx-city-results hidden" id="wxCityResults1"></div>
+                    </div>
+                    <button class="wx-city-reset" id="wxCityReset">恢复默认城市</button>
+                </div>
             </div>
-            <button id="refreshBgBtn" class="tool-btn" title="换一张壁纸">
-                <iconify-icon icon="material-symbols:refresh" width="18" height="18"></iconify-icon>
-            </button>
+
+            <!-- 自定义调色盘 -->
+            <div id="colorPicker" class="color-picker hidden">
+                <div class="cp-head">
+                    <button class="cp-back" id="cpBack" title="返回"><iconify-icon icon="mdi:chevron-left" width="16" height="16"></iconify-icon></button>
+                    <span>自定义颜色</span>
+                </div>
+                <div class="cp-sv" id="cpSV"><div class="cp-sv-white"></div><div class="cp-sv-black"></div><div class="cp-sv-cursor" id="cpSVCursor"></div></div>
+                <div class="cp-hue-row"><input type="range" id="cpHue" class="cp-hue" min="0" max="360" value="45"></div>
+                <div class="cp-preview-row">
+                    <span class="cp-preview" id="cpPreview"></span>
+                    <span class="cp-hex-label">HEX</span>
+                    <input type="text" id="cpHex" class="cp-hex" value="#FBBF24" maxlength="7" spellcheck="false">
+                </div>
+                <div class="cp-quick" id="cpQuick"></div>
+                    <button class="cp-apply" id="cpApply">应用颜色</button>
+            </div>
         </div>
 
     </div>
