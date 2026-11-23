@@ -13,3 +13,6 @@ Thumbs.db
 # 本地测试/临时文件
 _*.html
 _*.py
+
+# 本地数据表（歌曲与 R2 链接对照，仅本地保留，不提交）
+music-r2-links.csv

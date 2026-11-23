@@ -32,12 +32,15 @@
 │   ├── config.js              ★ 所有可配置项（日常维护只改这里）
 │   ├── script.js              交互逻辑（不含数据）
 │   ├── style.css              样式
-│   ├── music/                 本地音乐与封面（约 615 MB）
-│   │   ├── *.mp3
-│   │   └── cover/*
-│   └── vendor/                本地化依赖，运行时不访问 CDN
-│       ├── icons-data.js      图标 SVG 数据
-│       ├── iconify-icon.min.js 轻量图标组件
+│   ├── icons/                 ★ 所有图标资源集中在此
+│   │   ├── icons-data.js      图标 SVG 数据
+│   │   ├── iconify-icon.min.js 轻量图标组件
+│   │   ├── doubao.png         豆包站点图片图标
+│   │   └── gov.svg            萌ICP备案徽标
+│   ├── music/                 本地音乐与封面（约 615 MB，按播放列表顺序编号 01-）
+│   │   ├── 01-歌名.mp3
+│   │   └── cover/01-歌名.webp
+│   └── vendor/                第三方库，运行时不访问 CDN
 │       └── lunar.js           农历计算库
 └── README.md
 ```
@@ -57,7 +60,9 @@
 | 改站点起始时间 | `UPTIME_START` |
 | 改统计后端 | `STATS_API` |
 
-> 新增网站时若用了新的图标名，需要重新生成本地图标数据包，否则图标会空白。生成方式：把新图标名对应的 SVG 加入 `assets/vendor/icons-data.js` 的 `window.__ICONS__` 对象（格式 `{"前缀:名称":{"body":"<svg内部内容>","w":24,"h":24}}`），数据可从 [Iconify API](https://icon-sets.iconify.design/) 获取。
+> **新增网站/应用**：在 `SITES` 里加一行 `site(标题, 网址, 图标名)` 即可（见文件内 `site()` 辅助函数）。图标名来自 [Iconify](https://icon-sets.iconify.design/)，用新图标名时需把它加进 `assets/icons/icons-data.js` 的 `window.__ICONS__`（格式 `{"前缀:名称":{"body":"<svg内部内容>","w":24,"h":24}}`），否则图标空白；也可用 `img` 字段直接指定 `assets/icons/` 下的本地图片。
+>
+> **音乐文件命名**：`assets/music/` 里的 mp3 与 `assets/music/cover/` 里的封面按播放列表顺序统一编号为 `01-歌名`、`02-歌名`……，封面与音频同名、扩展名任意（webp/jpg/png 自动识别）。新增歌曲后按此格式命名并在 `MUSIC_SONGS` 加一行 `song(文件名, 歌名, 歌手)`。
 
 ---
 
@@ -125,7 +130,13 @@ npx serve -l 8777
 
 ## 说明
 
-- **音乐资源较大**：`assets/music/` 约 615 MB。如果介意仓库体积，可把音乐上传到对象存储或图床，然后把 `config.js` 中 `song()` 的文件名改成完整 URL、并用第 4 个参数指定封面外链，再删除本地音乐目录。
+- **音乐资源较大 / R2 加速**：`assets/music/` 约 615 MB。项目内置 **本地优先、Cloudflare R2 回退** 机制：
+  - `assets/music/` 下全部 65 首 mp3 + 65 张封面已上传到 R2 的 `music` 桶，键名与本地一一对应（`music/01-歌名.mp3`、`music/cover/01-歌名.webp`）；
+  - 桶已绑定公开自定义域 `https://musicfiles.yjh-web.eu.cc`（公开可读，无需任何密钥，仓库中无敏感信息），已填入 `config.js` 的 `MUSIC_CDN_BASE`；
+  - 本地文件加载超过 `MUSIC_CDN_TIMEOUT`（默认 3000 毫秒）仍未就绪、或加载失败时，自动切到 R2 同名文件，播放器歌名旁显示 `R2` 标记；本地正常则显示 `本地`；
+  - 把 `MUSIC_CDN_BASE` 留空即关闭回退，只用本地文件（不会有任何等待）。
+  
+  日后新增歌曲：文件同时放进本地 `assets/music/` 和 R2 桶（同名），再在 `MUSIC_SONGS` 加一行即可。
 - **访问统计**：使用与 SunPanel 相同的 WebViso 后端（`stats.web.yjhup.com`）。若不想统计，删除 `config.js` 中的 `statsApi` 即可。
 - **天气 / 壁纸**：来自 Open-Meteo、樱花 DMOE 和自建图库，均为公开接口，无需 Key。
 - **浏览器兼容**：使用了 Custom Elements 与 CSS 变量，建议 Chrome / Edge / Firefox / Safari 最新版。

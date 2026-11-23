@@ -18,6 +18,15 @@
     };
 
     const $ = id => document.getElementById(id);
+
+    // 下拉菜单互斥：打开一个时自动关闭其它工具下拉框
+    const DROPDOWN_IDS = ['themeMenu', 'wpSourceMenu', 'autoWpMenu', 'colorPicker'];
+    function closeDropdowns(except) {
+        DROPDOWN_IDS.forEach(id => {
+            const el = $(id);
+            if (el && id !== except) el.classList.add('hidden');
+        });
+    }
     const pad = n => String(n).padStart(2, '0');
 
     /* ============================================================
@@ -247,6 +256,13 @@
     const wallpaper = (function () {
         let source = store.get('wallpaper-source', 'dmoe');
         if (!WALLPAPER_SOURCES[source]) source = 'dmoe';
+        // 自定义图源 API（用户在菜单里输入，存 localStorage）
+        let customApi = store.get('wallpaper-custom-api', '');
+        // 自动换背景：开关 + 间隔（秒），设置持久化到 localStorage
+        let autoEnabled = store.get('wallpaper-auto-enabled', '0') === '1';
+        let autoInterval = parseInt(store.get('wallpaper-auto-interval', '60'), 10);
+        if (isNaN(autoInterval) || autoInterval < 5) autoInterval = 60;
+        let autoTimer = null;
 
         // 自建图库按屏幕宽高比自动选横屏/竖屏接口
         function selfhostBase() {
@@ -256,6 +272,11 @@
         }
 
         function buildUrl() {
+            // 自定义图源：直接返回图片地址，附加随机参数避免缓存
+            if (source === 'custom' && customApi) {
+                const sep = customApi.indexOf('?') === -1 ? '?' : '&';
+                return customApi + sep + 't=' + Date.now() + '&r=' + Math.random().toString(36).slice(2);
+            }
             // 第三个选项：在樱花 DMOE 与自建图库之间随机挑一个
             let chosen = source;
             if (source === 'mixed') chosen = Math.random() < 0.5 ? 'dmoe' : 'selfhost';
@@ -264,16 +285,27 @@
             return base + sep + 't=' + Date.now() + '&r=' + Math.random().toString(36).slice(2);
         }
 
+        // 双层交叉淡入淡出：新图在备用层加载完成后淡入，再交换主/备层
+        const layerA = $('wallpaper'), layerB = $('wallpaperFade');
+        let front = layerA, back = layerB;
+
         function load() {
-            const el = $('wallpaper');
             const refreshBtn = $('refreshBgBtn');
             if (refreshBtn) refreshBtn.classList.add('loading');
             const img = new Image();
             const url = buildUrl();
             img.onload = function () {
-                if (el) {
-                    el.style.backgroundImage = 'url("' + url + '")';
-                    el.classList.add('loaded');
+                if (back) {
+                    back.style.backgroundImage = 'url("' + url + '")';
+                    // 先确保备用层透明，再触发淡入（用短延时保证过渡生效）
+                    back.style.opacity = '0';
+                    back.classList.add('loaded');
+                    setTimeout(function () { back.style.opacity = '1'; }, 50);
+                    // 淡入完成后，把旧的前层隐藏并交换
+                    setTimeout(function () {
+                        if (front) { front.style.opacity = '0'; front.classList.remove('loaded'); }
+                        const tmp = front; front = back; back = tmp;
+                    }, 900);
                 }
                 if (refreshBtn) refreshBtn.classList.remove('loading');
             };
@@ -284,14 +316,104 @@
             img.src = url;
         }
 
+        // ---- 自动换背景 ----
+        function updateAutoUI() {
+            const btn = $('autoWpBtn');
+            const toggle = $('autoWpEnabled');
+            const input = $('autoWpInterval');
+            const status = $('autoWpStatus');
+            if (btn) btn.classList.toggle('on', autoEnabled);
+            if (toggle) toggle.checked = autoEnabled;
+            if (input) input.value = autoInterval;
+            document.querySelectorAll('.auto-wp-preset').forEach(b => {
+                b.classList.toggle('active', parseInt(b.getAttribute('data-sec'), 10) === autoInterval);
+            });
+            if (status) {
+                const min = Math.floor(autoInterval / 60), sec = autoInterval % 60;
+                const label = autoInterval >= 60
+                    ? (min + '分' + (sec ? sec + '秒' : ''))
+                    : (autoInterval + '秒');
+                status.textContent = autoEnabled ? '已开启 · 每 ' + label + ' 更换' : '已关闭';
+            }
+        }
+
+        function scheduleAuto() {
+            if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+            if (!autoEnabled) return;
+            autoTimer = setInterval(load, autoInterval * 1000);
+        }
+
+        function setAutoEnabled(on) {
+            autoEnabled = !!on;
+            store.set('wallpaper-auto-enabled', autoEnabled ? '1' : '0');
+            updateAutoUI();
+            scheduleAuto();
+        }
+
+        function setAutoInterval(sec) {
+            sec = parseInt(sec, 10);
+            if (isNaN(sec) || sec < 5) sec = 60;
+            autoInterval = sec;
+            store.set('wallpaper-auto-interval', String(autoInterval));
+            updateAutoUI();
+            scheduleAuto(); // 间隔变化时重设计时器
+        }
+
+        function initAuto() {
+            updateAutoUI();
+            scheduleAuto();
+
+            const btn = $('autoWpBtn');
+            const menu = $('autoWpMenu');
+            if (btn) btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const willOpen = menu && menu.classList.contains('hidden');
+                closeDropdowns(willOpen ? 'autoWpMenu' : null);
+                if (menu) menu.classList.toggle('hidden');
+            });
+            if (menu) menu.addEventListener('click', e => e.stopPropagation());
+
+            const toggle = $('autoWpEnabled');
+            if (toggle) toggle.addEventListener('change', function () { setAutoEnabled(this.checked); });
+
+            document.querySelectorAll('.auto-wp-preset').forEach(b => {
+                b.addEventListener('click', function () {
+                    setAutoInterval(parseInt(this.getAttribute('data-sec'), 10));
+                });
+            });
+
+            const input = $('autoWpInterval');
+            if (input) input.addEventListener('change', function () { setAutoInterval(this.value); });
+            // 自定义步进按钮（主题风格）
+            const up = $('intervalUp'), down = $('intervalDown');
+            if (up) up.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setAutoInterval(autoInterval + 5);
+            });
+            if (down) down.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setAutoInterval(Math.max(5, autoInterval - 5));
+            });
+
+            document.addEventListener('click', function () {
+                closeDropdowns();
+            });
+        }
+
         function applySourceMenu() {
             document.querySelectorAll('.wp-source-option').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-source') === source);
             });
+            // 选中自定义时展开 API 输入框并回填已保存地址
+            const box = $('wpCustomApi');
+            const input = $('wpCustomApiInput');
+            if (box) box.classList.toggle('hidden', source !== 'custom');
+            if (input && source === 'custom') input.value = customApi;
         }
 
         function init() {
             applySourceMenu();
+            initAuto();
             load();
 
             const refreshBtn = $('refreshBgBtn');
@@ -301,20 +423,67 @@
             const menu = $('wpSourceMenu');
             if (srcBtn) srcBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
+                const willOpen = menu && menu.classList.contains('hidden');
+                closeDropdowns(willOpen ? 'wpSourceMenu' : null);
                 if (menu) menu.classList.toggle('hidden');
             });
             document.querySelectorAll('.wp-source-option').forEach(btn => {
                 btn.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    source = this.getAttribute('data-source');
+                    const picked = this.getAttribute('data-source');
+                    // 选自定义但还没填 API 时，保持菜单打开并聚焦输入框
+                    if (picked === 'custom' && !customApi) {
+                        source = 'custom';
+                        store.set('wallpaper-source', source);
+                        applySourceMenu();
+                        const input = $('wpCustomApiInput');
+                        if (input) input.focus();
+                        return;
+                    }
+                    source = picked;
                     store.set('wallpaper-source', source);
                     applySourceMenu();
                     if (menu) menu.classList.add('hidden');
                     load();
                 });
             });
-            document.addEventListener('click', function () {
+
+            // 自定义图源 API：保存并切换
+            const apiInput = $('wpCustomApiInput');
+            const apiSave = $('wpCustomApiSave');
+            function saveCustomApi() {
+                if (!apiInput) return;
+                let val = apiInput.value.trim();
+                if (!val) {
+                    apiInput.placeholder = '请先输入 API 地址';
+                    return;
+                }
+                // 补全协议，避免相对地址无法加载
+                if (!/^https?:\/\//i.test(val)) val = 'https://' + val;
+                customApi = val;
+                store.set('wallpaper-custom-api', customApi);
+                source = 'custom';
+                store.set('wallpaper-source', source);
+                applySourceMenu();
                 if (menu) menu.classList.add('hidden');
+                load();
+            }
+            if (apiSave) apiSave.addEventListener('click', function (e) {
+                e.stopPropagation();
+                saveCustomApi();
+            });
+            if (apiInput) {
+                apiInput.addEventListener('click', e => e.stopPropagation());
+                apiInput.addEventListener('keydown', function (e) {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') saveCustomApi();
+                });
+            }
+            const apiBox = $('wpCustomApi');
+            if (apiBox) apiBox.addEventListener('click', e => e.stopPropagation());
+
+            document.addEventListener('click', function () {
+                closeDropdowns();
             });
         }
 
@@ -599,6 +768,14 @@
         const MUSIC_DIR = CFG.musicDir || 'assets/music/';
         const COVER_DIR = CFG.musicCoverDir || 'assets/music/cover/';
         const COVER_EXTS = ['webp', 'jpg', 'png', 'jpeg'];
+        // R2 回退：本地优先，慢/失败时切到公开域名同名文件
+        const CDN_BASE = String(CFG.musicCdnBase || '').replace(/\/+$/, '');
+        const CDN_TIMEOUT = parseInt(CFG.musicCdnTimeout, 10) || 3000;
+        // 本地路径 → R2 URL：assets/music/01-xxx.mp3 → <CDN_BASE>/music/01-xxx.mp3
+        function cdnUrl(localPath) {
+            if (!CDN_BASE || !localPath) return '';
+            return CDN_BASE + '/' + String(localPath).replace(/^\/?assets\//, '');
+        }
 
         // 从文件名解析歌名与歌手：去掉序号，按最后一个 "-" 拆分 "歌名-歌手"
         function parseFileName(file) {
@@ -615,9 +792,12 @@
                 return CFG.musicSongs.map(s => {
                     const parsed = parseFileName(s.file);
                     const base = String(s.file).replace(/\.[^.]+$/, '');
+                    // 封面候选：先本地，再 R2（同名文件）
+                    const localCovers = COVER_EXTS.map(ext => COVER_DIR + base + '.' + ext);
+                    const cdnCovers = CDN_BASE ? localCovers.map(cdnUrl) : [];
                     const cover = s.coverFile
-                        ? COVER_DIR + s.coverFile
-                        : { candidates: COVER_EXTS.map(ext => COVER_DIR + base + '.' + ext) };
+                        ? { candidates: [COVER_DIR + s.coverFile].concat(CDN_BASE ? [cdnUrl(COVER_DIR + s.coverFile)] : []) }
+                        : { candidates: localCovers.concat(cdnCovers) };
                     return {
                         name: s.name || parsed.name,
                         artist: s.artist || parsed.artist,
@@ -630,7 +810,7 @@
             return (CFG.musicPlaylist || []).map(s => ({ name: s.name, artist: s.artist, url: s.url, cover: s.cover }));
         })();
 
-        // 自动探测封面：按候选扩展名依次尝试，找到第一个能加载的（结果缓存）
+        // 自动探测封面：按候选依次尝试（本地 → R2），找到第一个能加载的（结果缓存）
         const coverCache = {};
         function resolveCover(song, cb) {
             const c = song.cover;
@@ -678,7 +858,14 @@
                 const num = document.createElement('span');
                 num.className = 'mpl-num'; num.textContent = (i + 1);
                 const name = document.createElement('span');
-                name.className = 'mpl-name'; name.textContent = song.name;
+                name.className = 'mpl-name';
+                name.textContent = song.name;
+                if (song.artist) {
+                    const artist = document.createElement('span');
+                    artist.className = 'mpl-artist';
+                    artist.textContent = ' · ' + song.artist;
+                    name.appendChild(artist);
+                }
                 item.appendChild(num); item.appendChild(name);
                 item.addEventListener('click', function (e) {
                     e.stopPropagation();
@@ -724,16 +911,80 @@
             if (wrap) wrap.classList.toggle('playing', !audio.paused);
         }
 
+        let loadToken = 0; // 防止旧请求的超时/错误回退干扰当前曲目
+
         function loadTrack(i, autoplay) {
             index = (i + PLAYLIST.length) % PLAYLIST.length;
-            audio.src = PLAYLIST[index].url;
+            const song = PLAYLIST[index];
+            const token = ++loadToken;
+            const localUrl = song.url;
+            const remoteUrl = cdnUrl(localUrl);
+            const canFallback = !!remoteUrl;
+            let switched = false;
+            let timer = null;
+            let settled = false;
+
             renderTrack();
             setText('mpCurTime', '0:00');
             setText('mpDurTime', '0:00');
             const bar = $('mpProgressBar'); if (bar) bar.style.width = '0%';
-            if (autoplay) {
-                audio.play().catch(() => {});
+            const thumb = $('mpProgressThumb'); if (thumb) thumb.style.left = '0%';
+
+            function setSource(src) {
+                const el = $('mpSource');
+                if (!el) return;
+                el.textContent = src === 'cdn' ? 'R2' : (src === 'error' ? '加载失败' : '本地');
+                el.className = 'mp-source' + (src === 'cdn' ? ' cdn' : '');
             }
+            function cleanup() {
+                if (timer) { clearTimeout(timer); timer = null; }
+                audio.removeEventListener('loadedmetadata', onReady);
+                audio.removeEventListener('canplay', onReady);
+                audio.removeEventListener('error', onError);
+                audio.removeEventListener('playing', onReady);
+            }
+            function onReady() {
+                if (token !== loadToken || settled) return;
+                // 只有真正拿到时长才算就绪（某些浏览器对失败源也会误触发 canplay）
+                if (!isFinite(audio.duration) || audio.duration <= 0) return;
+                settled = true;
+                cleanup();
+                setSource(switched ? 'cdn' : 'local');
+            }
+            function switchToCdn() {
+                if (switched || !remoteUrl || token !== loadToken || settled) return;
+                switched = true;
+                setSource('cdn');
+                const resume = audio.currentTime;
+                cleanup();
+                audio.src = remoteUrl;
+                audio.load();
+                audio.addEventListener('loadedmetadata', function resumeOnce() {
+                    audio.removeEventListener('loadedmetadata', resumeOnce);
+                    if (resume > 0 && isFinite(audio.duration)) audio.currentTime = Math.min(resume, audio.duration);
+                });
+                audio.addEventListener('loadedmetadata', onReady);
+                audio.addEventListener('canplay', onReady);
+                audio.addEventListener('error', onError);
+                if (autoplay) audio.play().catch(() => {});
+            }
+            function onError() {
+                if (token !== loadToken || settled) return;
+                if (!switched && canFallback) switchToCdn();
+                else { settled = true; cleanup(); setSource('error'); }
+            }
+
+            cleanup();
+            audio.addEventListener('loadedmetadata', onReady);
+            audio.addEventListener('canplay', onReady);
+            audio.addEventListener('playing', onReady);
+            audio.addEventListener('error', onError);
+            audio.src = localUrl;
+            setSource('local');
+            audio.load();
+            if (autoplay) audio.play().catch(() => {});
+            // 本地加载超时 → 切 R2
+            if (canFallback) timer = setTimeout(switchToCdn, CDN_TIMEOUT);
         }
 
         function togglePlay() {
@@ -808,15 +1059,30 @@
             const slider = $('mpVolume'); if (slider) slider.addEventListener('input', function () { applyVolume(this.value / 100); });
 
             const listBtn = $('mpPlaylistBtn'); const list = $('mpPlaylist');
-            if (listBtn) listBtn.addEventListener('click', function (e) { e.stopPropagation(); if (list) list.classList.toggle('hidden'); });
+            if (listBtn) listBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (!list) return;
+                // 打开时按可用空间限制高度，避免顶到右上角工具栏
+                if (list.classList.contains('hidden')) {
+                    const player = $('musicPlayer');
+                    const tools = document.querySelector('.wallpaper-tools');
+                    if (player && tools) {
+                        const playerTop = player.getBoundingClientRect().top;
+                        const toolsBottom = tools.getBoundingClientRect().bottom;
+                        const avail = Math.max(160, Math.min(260, playerTop - toolsBottom - 16));
+                        list.style.maxHeight = avail + 'px';
+                    }
+                }
+                list.classList.toggle('hidden');
+            });
             document.addEventListener('click', function (e) {
                 if (list && !list.contains(e.target) && e.target !== listBtn && !listBtn.contains(e.target)) list.classList.add('hidden');
             });
 
             // 进度条：支持点击 + 按住拖动（参考 Firefly 的 pointer 事件实现）
             const progress = $('mpProgress');
+            let dragging = false;
             if (progress) {
-                let dragging = false;
                 let dragPercent = 0;
                 function getPercent(e) {
                     const rect = progress.getBoundingClientRect();
@@ -825,12 +1091,17 @@
                 }
                 function paintProgress(pct) {
                     const bar = $('mpProgressBar');
-                    if (bar) bar.style.width = (pct * 100) + '%';
-                    if (audio.duration) setText('mpCurTime', fmt(pct * audio.duration));
+                    const thumb = $('mpProgressThumb');
+                    const p = Math.max(0, Math.min(1, pct));
+                    if (bar) bar.style.width = (p * 100) + '%';
+                    if (thumb) thumb.style.left = (p * 100) + '%';
+                    progress.setAttribute('aria-valuenow', Math.round(p * 100));
+                    if (audio.duration) setText('mpCurTime', fmt(p * audio.duration));
                 }
                 progress.addEventListener('pointerdown', function (e) {
                     if (e.button !== 0 || !audio.duration) return;
                     dragging = true;
+                    progress.classList.add('dragging');
                     try { progress.setPointerCapture(e.pointerId); } catch (err) {}
                     dragPercent = getPercent(e);
                     paintProgress(dragPercent);
@@ -844,6 +1115,7 @@
                 function finishDrag(e) {
                     if (!dragging) return;
                     dragging = false;
+                    progress.classList.remove('dragging');
                     try { progress.releasePointerCapture(e.pointerId); } catch (err) {}
                     if (audio.duration) audio.currentTime = dragPercent * audio.duration;
                 }
@@ -851,6 +1123,7 @@
                 progress.addEventListener('pointercancel', function (e) {
                     if (!dragging) return;
                     dragging = false;
+                    progress.classList.remove('dragging');
                     try { progress.releasePointerCapture(e.pointerId); } catch (err) {}
                     // 取消时恢复到实际播放位置
                     if (audio.duration) paintProgress(audio.currentTime / audio.duration);
@@ -862,8 +1135,13 @@
             audio.addEventListener('timeupdate', function () {
                 setText('mpCurTime', fmt(audio.currentTime));
                 setText('mpDurTime', fmt(audio.duration));
-                const bar = $('mpProgressBar');
-                if (bar && audio.duration) bar.style.width = (audio.currentTime / audio.duration * 100) + '%';
+                if (!dragging && audio.duration) {
+                    const pct = audio.currentTime / audio.duration;
+                    const bar = $('mpProgressBar'), thumb = $('mpProgressThumb');
+                    if (bar) bar.style.width = (pct * 100) + '%';
+                    if (thumb) thumb.style.left = (pct * 100) + '%';
+                    if (progress) progress.setAttribute('aria-valuenow', Math.round(pct * 100));
+                }
             });
             audio.addEventListener('ended', function () { next(true); });
             audio.addEventListener('error', function () {
@@ -913,10 +1191,10 @@
             document.querySelectorAll('.theme-option').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-theme') === theme);
             });
-            const customLabel = document.querySelector('.theme-custom');
+            const customLabel = $('themeCustomBtn');
             if (customLabel) customLabel.classList.toggle('active', theme === 'custom');
-            const colorInput = $('themeColorInput');
-            if (colorInput && /^#[0-9a-f]{6}$/i.test(customColor)) colorInput.value = customColor;
+            const swatch = $('customColorSwatch');
+            if (swatch) swatch.style.background = customColor;
         }
         apply();
 
@@ -924,6 +1202,8 @@
         const menu = $('themeMenu');
         if (btn) btn.addEventListener('click', function (e) {
             e.stopPropagation();
+            const willOpen = menu && menu.classList.contains('hidden');
+            closeDropdowns(willOpen ? 'themeMenu' : null);
             if (menu) menu.classList.toggle('hidden');
         });
         document.querySelectorAll('.theme-option').forEach(option => {
@@ -935,25 +1215,128 @@
                 if (menu) menu.classList.add('hidden');
             });
         });
-        // 自定义颜色：input 事件实时预览，change 事件持久化
-        const colorInput = $('themeColorInput');
-        if (colorInput) {
-            colorInput.addEventListener('input', function () {
-                theme = 'custom';
-                customColor = this.value;
-                apply();
-            });
-            colorInput.addEventListener('change', function () {
-                store.set('theme', 'custom');
-                store.set('theme-custom-color', this.value);
-            });
-            // 点击颜色框/标签不关闭菜单
-            colorInput.addEventListener('click', e => e.stopPropagation());
-            const customLabel = document.querySelector('.theme-custom');
-            if (customLabel) customLabel.addEventListener('click', e => e.stopPropagation());
+        // ---------- 自定义调色盘（主题风格，替代浏览器原生取色器） ----------
+        const picker = $('colorPicker');
+        const customBtn = $('themeCustomBtn');
+        const cpSV = $('cpSV'), cpSVCursor = $('cpSVCursor'), cpHue = $('cpHue');
+        const cpHex = $('cpHex'), cpPreview = $('cpPreview');
+
+        // HSV 状态（h:0-360, s/v:0-1）
+        let h = 45, s = 0.75, v = 1;
+        function hsvToHex(h, s, v) {
+            const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+            let r = 0, g = 0, b = 0;
+            if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; }
+            else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; }
+            else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+            const to2 = n => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+            return '#' + (to2(r) + to2(g) + to2(b)).toUpperCase();
         }
+        function hexToHsv(hex) {
+            const m6 = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+            if (!m6) return null;
+            const r = parseInt(m6[1], 16) / 255, g = parseInt(m6[2], 16) / 255, b = parseInt(m6[3], 16) / 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+            let hh = 0;
+            if (d) {
+                if (max === r) hh = 60 * (((g - b) / d) % 6);
+                else if (max === g) hh = 60 * ((b - r) / d + 2);
+                else hh = 60 * ((r - g) / d + 4);
+            }
+            if (hh < 0) hh += 360;
+            return { h: hh, s: max === 0 ? 0 : d / max, v: max };
+        }
+        function updatePicker() {
+            const hex = hsvToHex(h, s, v);
+            if (cpSV) cpSV.style.background = 'hsl(' + h + ', 100%, 50%)';
+            if (cpSVCursor) {
+                cpSVCursor.style.left = (s * 100) + '%';
+                cpSVCursor.style.top = ((1 - v) * 100) + '%';
+            }
+            if (cpHue) cpHue.value = Math.round(h);
+            if (cpHex) cpHex.value = hex;
+            if (cpPreview) cpPreview.style.background = hex;
+        }
+        function initHsvFromHex(hex) {
+            const r = hexToHsv(hex);
+            if (r) { h = r.h; s = r.s; v = r.v; }
+            updatePicker();
+        }
+
+        if (customBtn && picker) {
+            // 打开调色盘（关闭主题菜单，互斥其它下拉框）
+            customBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                closeDropdowns('colorPicker');
+                if (menu) menu.classList.add('hidden');
+                picker.classList.remove('hidden');
+                initHsvFromHex(customColor);
+            });
+            // 返回主题菜单
+            const back = $('cpBack');
+            if (back) back.addEventListener('click', function (e) {
+                e.stopPropagation();
+                picker.classList.add('hidden');
+                if (menu) menu.classList.remove('hidden');
+            });
+            picker.addEventListener('click', e => e.stopPropagation());
+
+            // SV 面板拖动
+            let draggingSV = false;
+            function onSV(e) {
+                if (!cpSV) return;
+                const r = cpSV.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                s = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+                v = 1 - Math.max(0, Math.min(1, (clientY - r.top) / r.height));
+                updatePicker();
+            }
+            if (cpSV) {
+                cpSV.addEventListener('mousedown', function (e) { draggingSV = true; onSV(e); });
+                cpSV.addEventListener('touchstart', function (e) { draggingSV = true; onSV(e); }, { passive: true });
+            }
+            document.addEventListener('mousemove', function (e) { if (draggingSV) onSV(e); });
+            document.addEventListener('touchmove', function (e) { if (draggingSV) onSV(e); }, { passive: true });
+            document.addEventListener('mouseup', function () { draggingSV = false; });
+            document.addEventListener('touchend', function () { draggingSV = false; });
+
+            // 色相滑块
+            if (cpHue) cpHue.addEventListener('input', function () { h = parseFloat(this.value); updatePicker(); });
+
+            // HEX 手动输入
+            if (cpHex) cpHex.addEventListener('change', function () {
+                const parsed = hexToHsv(this.value);
+                if (parsed) { h = parsed.h; s = parsed.s; v = parsed.v; updatePicker(); }
+                else updatePicker();
+            });
+
+            // 快捷色块
+            const quick = $('cpQuick');
+            if (quick) {
+                ['#FBBF24', '#60A5FA', '#34D399', '#A78BFA', '#FB7185', '#22D3EE', '#F87171', '#F472B6'].forEach(hex => {
+                    const b = document.createElement('button');
+                    b.type = 'button'; b.style.background = hex; b.title = hex;
+                    b.addEventListener('click', function (e) { e.stopPropagation(); initHsvFromHex(hex); });
+                    quick.appendChild(b);
+                });
+            }
+
+            // 应用
+            const applyBtn = $('cpApply');
+            if (applyBtn) applyBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                customColor = hsvToHex(h, s, v);
+                theme = 'custom';
+                store.set('theme', 'custom');
+                store.set('theme-custom-color', customColor);
+                apply();
+                picker.classList.add('hidden');
+            });
+        }
+
         document.addEventListener('click', function () {
-            if (menu) menu.classList.add('hidden');
+            closeDropdowns();
         });
     }
 
