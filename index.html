@@ -244,6 +244,9 @@
 
     <!-- 右上角工具：随整体淡出 -->
     <div class="wallpaper-tools">
+        <button id="fadeNowBtn" class="tool-btn" title="立即隐藏所有组件">
+            <iconify-icon icon="mdi:eye-off-outline" width="19" height="19"></iconify-icon>
+        </button>
         <button id="refreshBgBtn" class="tool-btn" title="换一张壁纸">
             <iconify-icon icon="mdi:refresh" width="19" height="19"></iconify-icon>
         </button>
@@ -282,9 +285,27 @@
                 <div id="wpSourceMenu" class="settings-section">
                     <div class="wp-menu-title">壁纸图源</div>
                     <button class="wp-source-option" data-source="dmoe"><span class="wp-dot"></span><span class="wp-source-name">樱花 DMOE · 二次元</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
+                    <button class="wp-source-option" data-source="php"><span class="wp-dot"></span><span class="wp-source-name">作者自建图源</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
                     <button class="wp-source-option" data-source="selfhost"><span class="wp-dot"></span><span class="wp-source-name">作者自建随机图</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
                     <button class="wp-source-option" data-source="mixed"><span class="wp-dot"></span><span class="wp-source-name">两者随机</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
                     <button class="wp-source-option" data-source="custom"><span class="wp-dot"></span><span class="wp-source-name">自定义图源</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
+                    <!-- 作者自建图源（selfhost / php）的内容类型：图片 / ACG 动图 / 视频 -->
+                    <div class="wp-sub-options hidden" id="wpMediaOptions">
+                        <div class="wp-menu-title wp-sub-title">返回内容</div>
+                        <div class="wp-seg" id="wpMediaSeg">
+                            <button type="button" class="wp-seg-btn active" data-media="image">图片</button>
+                            <button type="button" class="wp-seg-btn" data-media="acg">ACG 动图</button>
+                            <button type="button" class="wp-seg-btn" data-media="video">视频</button>
+                        </div>
+                    </div>
+                    <!-- CDN 选择：两种自建图源都支持，访问方式相同（默认 eo） -->
+                    <div class="wp-sub-options hidden" id="wpCdnOptions">
+                        <div class="wp-menu-title wp-sub-title">CDN 节点</div>
+                        <div class="wp-seg" id="wpCdnSeg">
+                            <button type="button" class="wp-seg-btn active" data-cdn="cf">Cloudflare</button>
+                            <button type="button" class="wp-seg-btn" data-cdn="eo">EdgeOne</button>
+                        </div>
+                    </div>
                     <div class="wp-custom-api" id="wpCustomApi">
                         <input type="text" id="wpCustomApiInput" class="wp-api-input" placeholder="输入图片 API 地址" spellcheck="false">
                         <button type="button" class="wp-api-save" id="wpCustomApiSave" title="保存图源"><iconify-icon icon="mdi:check" width="14" height="14"></iconify-icon></button>

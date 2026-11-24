@@ -10,6 +10,7 @@
     const SITES = CFG.sites || [];
     const SEARCH_ENGINES = CFG.searchEngines || {};
     const WALLPAPER_SOURCES = CFG.wallpaperSources || {};
+    const WALLPAPER_CDNS = CFG.wallpaperCdns || {};
 
     // ---------- 存储辅助（隐私模式下 localStorage 可能抛错） ----------
     const store = {
@@ -308,6 +309,12 @@
     const wallpaper = (function () {
         let source = store.get('wallpaper-source', 'dmoe');
         if (!WALLPAPER_SOURCES[source]) source = 'dmoe';
+        // 自建图源返回内容类型：image（按屏幕横竖）/ acg（动图）/ video（视频）
+        let media = store.get('wallpaper-media', 'image');
+        if (['image', 'acg', 'video'].indexOf(media) === -1) media = 'image';
+        // 自建图源 CDN：cf / eo（访问方式相同，仅域名不同），默认 eo
+        let cdn = store.get('wallpaper-cdn', 'eo');
+        if (!WALLPAPER_CDNS[cdn]) cdn = 'cf';
         // 自定义图源 API（用户在菜单里输入，存 localStorage）
         let customApi = store.get('wallpaper-custom-api', '');
         // 自动换背景：开关 + 间隔（秒），设置持久化到 localStorage
@@ -316,52 +323,141 @@
         if (isNaN(autoInterval) || autoInterval < 5) autoInterval = 60;
         let autoTimer = null;
 
-        // 自建图库按屏幕宽高比自动选横屏/竖屏接口
-        function selfhostBase() {
-            const ratio = window.innerWidth / window.innerHeight;
-            const orientation = ratio >= 1 ? 'landscape' : 'portrait';
-            return WALLPAPER_SOURCES.selfhost.url + orientation;
+        // 按屏幕宽高比选横屏/竖屏接口
+        function orientation() {
+            return window.innerWidth / window.innerHeight >= 1 ? 'landscape' : 'portrait';
+        }
+        // Cloudflare Pages 函数接口：cf/eo 两条 CDN 路径完全一致
+        function apiPath(base, mode) {
+            const path = media === 'image' ? orientation() : media; // image → landscape/portrait
+            return base + path;
+        }
+        // 虚拟主机 PHP 接口：api.php?path=xxx&cdn=cf|eo（别名同样可搭配 cdn）
+        function phpPath() {
+            const path = media === 'image' ? orientation() : media;
+            // 默认 eo 可省略，但显式带上更清晰、也便于切换后立即生效
+            return WALLPAPER_SOURCES.php.url + path + '&cdn=' + cdn;
         }
 
         function buildUrl() {
             // 自定义图源：直接返回图片地址，附加随机参数避免缓存
             if (source === 'custom' && customApi) return withBust(customApi);
-            // mixed：在樱花 DMOE 与作者自建随机图之间随机挑一个
-            let chosen = source;
-            if (source === 'mixed') chosen = Math.random() < 0.5 ? 'dmoe' : 'selfhost';
-            const base = chosen === 'dmoe' ? WALLPAPER_SOURCES.dmoe.url : selfhostBase();
-            return withBust(base);
+            // mixed：在樱花 DMOE 与作者自建图源（PHP）之间随机挑一个
+            if (source === 'dmoe') return withBust(WALLPAPER_SOURCES.dmoe.url);
+            if (source === 'php') return withBust(phpPath());
+            if (source === 'selfhost') return withBust(apiPath(WALLPAPER_CDNS[cdn].base, media));
+            // mixed：dmoe 或 php
+            if (Math.random() < 0.5) return withBust(WALLPAPER_SOURCES.dmoe.url);
+            return withBust(phpPath());
         }
 
-        // 双层交叉淡入淡出：新图在备用层加载完成后淡入，再交换主/备层
+        // 双层交叉淡入淡出：新媒体在备用层准备好后淡入，再交换主/备层
         const layerA = $('wallpaper'), layerB = $('wallpaperFade');
         let front = layerA, back = layerB;
+        let loadToken = 0; // 防止手动刷新与定时器并发时相互干扰
+
+        // 移除某一层里的视频元素（切回静态图或换下一个视频时）
+        function clearVideo(layer) {
+            if (!layer) return;
+            $$('video', layer).forEach(v => { try { v.pause(); } catch (e) {} v.remove(); });
+        }
+        // 淡出层里的暂停播放，避免后台视频持续占用解码资源
+        function pauseVideo(layer) {
+            if (!layer) return;
+            $$('video', layer).forEach(v => { try { v.pause(); } catch (e) {} });
+        }
+
+        function fadeIn(token, done) {
+            if (token !== loadToken || !back) { if (done) done(); return; }
+            back.style.opacity = '0';
+            back.classList.add('loaded');
+            setTimeout(function () { if (token === loadToken) back.style.opacity = '1'; }, 50);
+            // 淡入完成后隐藏旧前层并交换；旧层若是视频则暂停
+            setTimeout(function () {
+                if (token !== loadToken) return;
+                if (front) {
+                    front.style.opacity = '0';
+                    front.classList.remove('loaded');
+                    pauseVideo(front);
+                }
+                const tmp = front; front = back; back = tmp;
+                if (done) done();
+            }, 900);
+        }
 
         function load() {
             const refreshBtn = $('refreshBgBtn');
+            const token = ++loadToken;
             if (refreshBtn) refreshBtn.classList.add('loading');
-            const img = new Image();
             const url = buildUrl();
-            img.onload = function () {
-                if (back) {
-                    back.style.backgroundImage = 'url("' + url + '")';
-                    // 先确保备用层透明，再触发淡入（用短延时保证过渡生效）
-                    back.style.opacity = '0';
-                    back.classList.add('loaded');
-                    setTimeout(function () { back.style.opacity = '1'; }, 50);
-                    // 淡入完成后，把旧的前层隐藏并交换
-                    setTimeout(function () {
-                        if (front) { front.style.opacity = '0'; front.classList.remove('loaded'); }
-                        const tmp = front; front = back; back = tmp;
-                    }, 900);
+            let settled = false;
+            let videoTried = false;
+            let fallbackTimer = null;
+            const stopLoading = () => { if (refreshBtn && token === loadToken) refreshBtn.classList.remove('loading'); };
+
+            // 把已准备好的媒体放到备用层并淡入。kind=image|video
+            function present(kind, videoEl) {
+                if (settled || token !== loadToken || !back) return;
+                settled = true;
+                clearTimeout(fallbackTimer);
+                clearVideo(back);
+                if (kind === 'video') {
+                    // 视频：铺满容器，静音自动循环，不显示任何播放控件
+                    back.style.backgroundImage = '';
+                    back.appendChild(videoEl);
+                    const p = videoEl.play();
+                    if (p && p.catch) p.catch(function () {});
+                } else {
+                    // 图片：GIF / APNG / 动态 WebP 由浏览器原生循环播放，直接作为背景
+                    back.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
                 }
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            };
-            img.onerror = function () {
-                // 换图失败时保留上一张，仅取消加载动画
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            };
+                back.dataset.media = kind;
+                fadeIn(token, stopLoading);
+            }
+
+            // 图片解码失败 → 视为视频（API 常返回无扩展名的 mp4/webm）
+            function tryVideo() {
+                if (settled || videoTried || token !== loadToken || !back) return;
+                videoTried = true;
+                clearTimeout(fallbackTimer);
+                clearVideo(back);
+                back.style.backgroundImage = '';
+                const video = document.createElement('video');
+                video.className = 'wallpaper-video';
+                video.autoplay = true;
+                video.loop = true;
+                video.muted = true;                   // 静音以满足自动播放策略
+                video.playsInline = true;             // iOS 不强制全屏
+                video.setAttribute('playsinline', '');
+                video.setAttribute('webkit-playsinline', '');
+                video.preload = 'auto';
+                video.setAttribute('aria-hidden', 'true');
+                // 故意不设置 controls：背景视频不提供播放组件
+                let videoSettled = false;
+                video.addEventListener('loadeddata', function () {
+                    if (videoSettled) return;
+                    videoSettled = true;
+                    present('video', video);
+                }, { once: true });
+                video.addEventListener('error', function () {
+                    if (videoSettled) return;
+                    videoSettled = true;
+                    // 图片和视频都失败：保留上一张壁纸，只取消加载动画
+                    clearVideo(back);
+                    settled = true;
+                    clearTimeout(fallbackTimer);
+                    stopLoading();
+                }, { once: true });
+                video.src = url;
+                back.appendChild(video);
+            }
+
+            // 先按图片尝试；加载中若迟迟无响应（慢速视频流）则兜底转视频探测
+            const img = new Image();
+            img.onload = function () { present('image'); };
+            img.onerror = function () { tryVideo(); };
             img.src = url;
+            fallbackTimer = setTimeout(function () { if (!settled) tryVideo(); }, 12000);
         }
 
         // ---- 自动换背景 ----
@@ -436,6 +532,17 @@
             $$('.wp-source-option').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-source') === source);
             });
+            // 两种自建图源都显示内容类型与 CDN 选项（cf/eo 访问方式相同）
+            const mediaBox = $('wpMediaOptions'), cdnBox = $('wpCdnOptions');
+            const isApiSource = source === 'selfhost' || source === 'php';
+            if (mediaBox) mediaBox.classList.toggle('hidden', !isApiSource);
+            if (cdnBox) cdnBox.classList.toggle('hidden', !isApiSource);
+            $$('.wp-seg-btn[data-media]').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-media') === media);
+            });
+            $$('.wp-seg-btn[data-cdn]').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-cdn') === cdn);
+            });
             // 选中自定义时展开 API 输入框并回填已保存地址
             const box = $('wpCustomApi');
             const input = $('wpCustomApiInput');
@@ -466,6 +573,27 @@
                     }
                     source = picked;
                     store.set('wallpaper-source', source);
+                    applySourceMenu();
+                    load();
+                });
+            });
+
+            // 作者自建图源：内容类型（图片 / ACG 动图 / 视频）
+            $$('.wp-seg-btn[data-media]').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    media = this.getAttribute('data-media');
+                    store.set('wallpaper-media', media);
+                    applySourceMenu();
+                    load();
+                });
+            });
+            // 作者自建随机图：CDN 选择（cf / eo，访问方式相同）
+            $$('.wp-seg-btn[data-cdn]').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    cdn = this.getAttribute('data-cdn');
+                    store.set('wallpaper-cdn', cdn);
                     applySourceMenu();
                     load();
                 });
@@ -1631,6 +1759,34 @@
             document.addEventListener(ev, reset, { passive: true });
         });
         reset();
+
+        // 右上角「立即隐藏」按钮：把所有组件（含自身）瞬间淡出。
+        // 按钮本身在 #fadeLayer 内，随 layer 一起消失；任意操作仍会走上面的 reset() 恢复。
+        const hideBtn = $('fadeNowBtn');
+        if (hideBtn) hideBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (timer) { clearTimeout(timer); timer = null; }
+            if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
+            document.body.classList.add('idle');
+            hidden = true;
+            // 用 CSS 过渡做快速淡出（0.35s），而非闲置时的 2s 渐进
+            layer.style.transition = 'opacity .35s ease';
+            layer.style.opacity = '0';
+            layer.style.pointerEvents = 'none';
+            // 淡出动画结束后恢复默认过渡时长，避免影响后续闲置淡出
+            setTimeout(function () { layer.style.transition = ''; }, 400);
+            // 只重置计时器，不调用 reset()（它会 show() 把组件又显示出来）
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                document.body.classList.add('idle');
+                let op = 1;
+                fadeInterval = setInterval(() => {
+                    op -= 0.05;
+                    if (op <= 0) { op = 0; clearInterval(fadeInterval); fadeInterval = null; hidden = true; layer.style.pointerEvents = 'none'; }
+                    layer.style.opacity = op;
+                }, 100);
+            }, 30000);
+        });
     }
 
     /* ============================================================

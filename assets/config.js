@@ -61,12 +61,28 @@
     };
 
     /* ---------- 壁纸图源 ----------
-     * 程序按屏幕宽高比自动为「作者自建随机图」选择 landscape/portrait。
-     * mixed = 在 dmoe 与 selfhost 之间随机。
+     * dmoe     樱花 DMOE 二次元随机图
+     * php      作者自建图源（虚拟主机 api.php），排第二；支持 cf/eo 与图片/acg/视频
+     * selfhost 作者自建随机图（Cloudflare Pages 函数接口），排第三；同样支持 cf/eo 与图片/acg/视频
+     * mixed    在 dmoe 与 php（作者自建图源）之间随机
+     * custom   用户自定义 API（浏览器端输入并保存）
+     *
+     * 两种自建图源的 cf/eo 访问方式一致，仅 CDN 不同，默认 eo：
+     *   cf https://static-imgapi.web.yjhup.com
+     *   eo https://static-imgapi-eocdn.web.yjhup.com
+     * Pages 接口：{cdn}/api/{landscape|portrait|acg|video}
+     * PHP 接口：api.php?path=...&cdn=cf|eo（默认 eo，可省略）
+     * 图片按屏幕宽高比自动选 landscape/portrait；acg 为 animated WebP；video 为 MP4。
+     * 视频会静音自动循环、不显示播放控件（见 script.js 的 wallpaper.load）。
      */
+    const WALLPAPER_CDNS = {
+        cf: { name: 'Cloudflare', base: 'https://static-imgapi.web.yjhup.com/api/' },
+        eo: { name: 'EdgeOne',    base: 'https://static-imgapi-eocdn.web.yjhup.com/api/' }
+    };
     const WALLPAPER_SOURCES = {
         dmoe:     { name: '樱花 DMOE · 二次元', url: 'https://www.dmoe.cc/random.php' },
-        selfhost: { name: '作者自建随机图', url: 'https://static-imgapi.web.yjhup.com/api/' },
+        php:      { name: '作者自建图源', url: 'https://sad-random-photos.web.yjhup.com/api.php?path=' },
+        selfhost: { name: '作者自建随机图', url: WALLPAPER_CDNS.eo.base },
         mixed:    { name: '两者随机', url: '' },
         custom:   { name: '自定义图源', url: '' } // API 地址由用户在页面上输入，保存在浏览器端
     };
@@ -197,6 +213,7 @@
         sites: SITES,
         searchEngines: SEARCH_ENGINES,
         wallpaperSources: WALLPAPER_SOURCES,
+        wallpaperCdns: WALLPAPER_CDNS,
         themes: THEMES,
         weatherLocations: WEATHER_LOCATIONS,
         musicDir: MUSIC_DIR,

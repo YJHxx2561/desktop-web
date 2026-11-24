@@ -39,6 +39,12 @@ body {
     opacity: 0; transition: opacity 0.8s ease;
 }
 .wallpaper.loaded { opacity: 1; }
+/* 视频壁纸：铺满容器、保持比例裁切；无 controls，静音自动循环 */
+.wallpaper-video {
+    position: absolute; inset: 0; display: block;
+    width: 100%; height: 100%; object-fit: cover;
+    pointer-events: none;
+}
 /* 淡入淡出备用层：位于主壁纸之上、遮罩之下，切换时交叉淡入 */
 .wallpaper-fade { z-index: -2; transition: opacity 0.85s ease; }
 .wallpaper-overlay {
@@ -511,6 +517,20 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .wp-check { color: var(--accent); visibility: hidden; }
 .wp-source-option.active .wp-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .wp-source-option.active .wp-check { visibility: visible; }
+/* 自建图源子选项：内容类型 / CDN 节点（分段按钮） */
+.wp-sub-options { margin: 4px 6px 6px; padding: 6px 0 2px; border-top: 1px solid var(--glass-border); }
+.wp-sub-options .wp-sub-title { padding: 2px 2px 5px; }
+.wp-seg { display: flex; gap: 4px; }
+.wp-seg-btn {
+    flex: 1; min-width: 0; padding: 6px 2px; border: 1px solid var(--glass-border);
+    border-radius: 7px; background: rgba(255,255,255,.06); color: var(--text-dim);
+    font-size: 11px; cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.wp-seg-btn:hover { background: rgba(255,255,255,.13); color: #fff; }
+.wp-seg-btn.active {
+    background: var(--accent-soft); border-color: rgba(var(--accent-rgb),.5);
+    color: var(--accent); font-weight: 700;
+}
 /* 自定义图源 API 输入 */
 .wp-custom-api {
     display: flex; align-items: center; gap: 6px; margin: 6px 6px 2px; padding-top: 8px;
