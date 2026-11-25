@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#1a1a2e">
+    <meta name="description" content="纯静态浏览器桌面主页：时钟、日历、天气、音乐与随机壁纸">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="assets/pwa/icon-192.png">
     <title>Desktop · 我的桌面</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
 
@@ -244,6 +249,12 @@
 
     <!-- 右上角工具：随整体淡出 -->
     <div class="wallpaper-tools">
+        <button id="fullscreenBtn" class="tool-btn hidden" title="进入全屏">
+            <iconify-icon icon="mdi:fullscreen" width="19" height="19"></iconify-icon>
+        </button>
+        <button id="installBtn" class="tool-btn hidden" title="安装到桌面">
+            <iconify-icon icon="mdi:download-circle-outline" width="19" height="19"></iconify-icon>
+        </button>
         <button id="fadeNowBtn" class="tool-btn" title="立即隐藏所有组件">
             <iconify-icon icon="mdi:eye-off-outline" width="19" height="19"></iconify-icon>
         </button>

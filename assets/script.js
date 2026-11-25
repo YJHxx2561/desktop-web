@@ -1727,7 +1727,10 @@
         const layer = $('fadeLayer') || $('pageContent');
         if (!layer) return;
         let timer = null, fadeInterval = null, hidden = false;
+        // 手动隐藏标记：为 true 时只响应页面内点击，鼠标移动/滚动/按键都不恢复
+        let manualHidden = false;
         function show() {
+            manualHidden = false;
             if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
             // 恢复组件时同步恢复壁纸遮罩（壁纸回到变暗状态，保证文字可读）
             document.body.classList.remove('idle');
@@ -1737,7 +1740,9 @@
                 hidden = false;
             }
         }
-        function reset() {
+        function reset(e) {
+            // 手动隐藏后，只有页面内任意点击（或触摸点击）才恢复组件
+            if (manualHidden && (!e || e.type !== 'click')) return;
             show();
             if (timer) clearTimeout(timer);
             timer = setTimeout(() => {
@@ -1760,8 +1765,7 @@
         });
         reset();
 
-        // 右上角「立即隐藏」按钮：把所有组件（含自身）瞬间淡出。
-        // 按钮本身在 #fadeLayer 内，随 layer 一起消失；任意操作仍会走上面的 reset() 恢复。
+        // 右上角「立即隐藏」按钮：快速淡出所有组件（含自身），之后只有页面内点击才恢复
         const hideBtn = $('fadeNowBtn');
         if (hideBtn) hideBtn.addEventListener('click', function (e) {
             e.stopPropagation();
@@ -1769,23 +1773,68 @@
             if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
             document.body.classList.add('idle');
             hidden = true;
-            // 用 CSS 过渡做快速淡出（0.35s），而非闲置时的 2s 渐进
+            manualHidden = true;
             layer.style.transition = 'opacity .35s ease';
             layer.style.opacity = '0';
             layer.style.pointerEvents = 'none';
-            // 淡出动画结束后恢复默认过渡时长，避免影响后续闲置淡出
-            setTimeout(function () { layer.style.transition = ''; }, 400);
-            // 只重置计时器，不调用 reset()（它会 show() 把组件又显示出来）
-            if (timer) clearTimeout(timer);
-            timer = setTimeout(() => {
-                document.body.classList.add('idle');
-                let op = 1;
-                fadeInterval = setInterval(() => {
-                    op -= 0.05;
-                    if (op <= 0) { op = 0; clearInterval(fadeInterval); fadeInterval = null; hidden = true; layer.style.pointerEvents = 'none'; }
-                    layer.style.opacity = op;
-                }, 100);
-            }, 30000);
+        });
+    }
+
+    /* ============================================================
+     * 11. 全屏切换（右上角按钮）
+     * ============================================================ */
+    function initFullscreen() {
+        const btn = $('fullscreenBtn');
+        if (!btn) return;
+        const icon = btn.querySelector('iconify-icon');
+        btn.classList.remove('hidden'); // 浏览器支持才显示
+
+        function paint() {
+            const on = !!document.fullscreenElement;
+            if (icon) icon.setAttribute('icon', on ? 'mdi:fullscreen-exit' : 'mdi:fullscreen');
+            btn.title = on ? '退出全屏' : '进入全屏';
+        }
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (document.fullscreenElement) {
+                if (document.exitFullscreen) document.exitFullscreen().catch(function () {});
+            } else if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(function () {});
+            }
+        });
+        document.addEventListener('fullscreenchange', paint);
+        paint();
+    }
+
+    /* ============================================================
+     * 12. PWA 安装（捕获 beforeinstallprompt，右上角按钮触发；支持多端各自安装）
+     * ============================================================ */
+    function initPwaInstall() {
+        const btn = $('installBtn');
+        if (!btn) return;
+        let deferred = null;
+
+        // 已安装（standalone 模式）时隐藏安装按钮
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+            btn.classList.add('hidden');
+            return;
+        }
+        // 开发/本地 file:// 下无安装事件时，也先隐藏，等事件到来再显示
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferred = e;
+            btn.classList.remove('hidden');
+        });
+        window.addEventListener('appinstalled', function () {
+            deferred = null;
+            btn.classList.add('hidden');
+        });
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (deferred) {
+                deferred.prompt();
+                deferred.userChoice.then(function () { deferred = null; btn.classList.add('hidden'); });
+            }
         });
     }
 
@@ -1807,6 +1856,12 @@
         initIdleFade();
         initSettingsPanel();
         weather.initCitySettings();
+        initFullscreen();
+        initPwaInstall();
+        // PWA Service Worker：仅 http(s) 下注册（file:// 不支持，双击打开时静默跳过）
+        if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+            navigator.serviceWorker.register('./sw.js').catch(function () {});
+        }
     }
 
     if (document.readyState === 'loading') {
