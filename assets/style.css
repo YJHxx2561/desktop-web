@@ -2,7 +2,6 @@
  * Desktop · 我的桌面
  * 三栏布局：日历(左) | 时钟+搜索(中) | 天气(右)，一屏完整显示
  * ============================================================ */
-
 :root {
     /* 主题色（可被右上角主题切换按钮覆盖） */
     --accent-rgb: 251, 191, 36;
@@ -17,10 +16,8 @@
     --radius: 16px;
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
 }
-
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
-
 body {
     margin: 0;
     min-height: 100vh;
@@ -30,7 +27,6 @@ body {
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
 }
-
 /* ---------- 壁纸 ---------- */
 .wallpaper {
     position: fixed; inset: 0; z-index: -2;
@@ -45,34 +41,24 @@ body {
     width: 100%; height: 100%; object-fit: cover;
     pointer-events: none;
 }
-/* 淡入淡出备用层：位于主壁纸之上、遮罩之下，切换时交叉淡入 */
+/* 淡入淡出备用层：位于主壁纸之上，切换时交叉淡入；壁纸不做压暗，保持原图色彩 */
 .wallpaper-fade { z-index: -2; transition: opacity 0.85s ease; }
-.wallpaper-overlay {
-    position: fixed; inset: 0; z-index: -1; pointer-events: none;
-    background: linear-gradient(160deg, rgba(10,12,30,.34) 0%, rgba(12,18,38,.5) 55%, rgba(8,10,26,.66) 100%);
-    transition: opacity 0.9s ease;
-}
-/* 闲置淡出时移除遮罩，让壁纸恢复原有亮度 */
-body.idle .wallpaper-overlay { opacity: 0; }
-
 /* ---------- 淡出图层 / 主体 ---------- */
-#fadeLayer { transition: opacity 0.9s ease; }
+/* 淡出/淡入时长由 script.js 按场景设置（闲置2s/手动0.35s/恢复0.6s），此为初始兜底 */
+#fadeLayer { transition: opacity 0.6s ease; }
 .page-content {
     width: 100%; max-width: 1760px; margin: 0 auto;
     padding: clamp(60px, 6.5vh, 76px) clamp(10px, 1.5vw, 22px) clamp(10px, 1.5vh, 18px);
     display: flex; flex-direction: column; justify-content: flex-start;
     min-height: 100vh;
 }
-
 .card {
     background: var(--card-bg);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
 }
 .hidden { display: none !important; }
-
 /* ============ 顶部三栏布局：左右卡片等宽对称 ============ */
 .stage {
     display: grid;
@@ -89,7 +75,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
 }
 .stage-right { gap: 12px; }
 .stage-right .weather-card { flex: 1 1 auto; }
-
 /* ---------- 模拟表盘 + 数字时钟（公历在左、农历在右） ---------- */
 .hero { display: flex; flex-direction: column; align-items: center; text-align: center; }
 /* 左右等宽：保证表盘在两个断点之间也始终真正居中 */
@@ -152,13 +137,11 @@ body.idle .wallpaper-overlay { opacity: 0; }
 }
 .clock-time:hover { color: #9FDCF7; }
 .clock-ampm { margin-top: 3px; font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--accent); min-height: 15px; }
-
 .greet-line {
     margin-bottom: 14px; font-size: 19px; font-weight: 600; letter-spacing: 3px;
     color: var(--text); text-shadow: 0 2px 12px rgba(0,0,0,.55);
 }
 .date-line, .lunar-line { text-shadow: 0 2px 10px rgba(0,0,0,.5); }
-
 /* ---------- 搜索框 ---------- */
 .search-section { display: flex; justify-content: center; margin-top: 16px; width: 100%; }
 .search-box {
@@ -166,7 +149,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
     width: 100%; max-width: 520px; height: 48px; padding: 0 6px 0 4px;
     border-radius: 15px; background: rgba(255,255,255,.09);
     border: 1px solid rgba(255,255,255,.14);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     box-shadow: var(--shadow); transition: all .3s ease;
 }
 .search-box:focus-within {
@@ -182,7 +164,7 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .engine-btn:hover { background: rgba(255,255,255,.1); }
 .engine-dropdown {
     position: absolute; top: calc(100% + 10px); left: 0; min-width: 150px; padding: 6px;
-    background: rgba(30,32,48,.96); backdrop-filter: blur(16px);
+    background: rgba(30,32,48,.96); 
     border: 1px solid var(--glass-border); border-radius: 12px; box-shadow: var(--shadow); z-index: 50;
 }
 .engine-option {
@@ -203,7 +185,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
     cursor: pointer; transition: all .2s;
 }
 .search-btn:hover { background: rgba(var(--accent-rgb),.26); transform: translateX(2px); }
-
 /* ---------- 日历 ---------- */
 .calendar-card { width: 100%; max-width: 330px; height: 100%; padding: 14px 16px 12px; display: flex; flex-direction: column; }
 .card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
@@ -244,7 +225,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
     margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.14);
     font-size: 10.5px; color: var(--text-dim); text-align: center; line-height: 1.45;
 }
-
 /* ---------- 天气（两地） ---------- */
 .weather-card { width: 100%; max-width: 330px; padding: 14px 18px; display: flex; flex-direction: column; justify-content: center; }
 .wx-block-head { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-dim); }
@@ -264,7 +244,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .wx-range { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
 .wx-aqi { margin-top: 6px; font-size: 10.5px; color: var(--text-faint); }
 .wx-divider { height: 1px; background: rgba(255,255,255,.14); margin: 12px 0; }
-
 /* ---------- 网站 dock（下移贴近页脚，中间留空） ---------- */
 .dock-section { margin-top: auto; margin-bottom: 0; padding-top: clamp(20px, 4vh, 40px); }
 .site-dock { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
@@ -273,7 +252,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
     display: flex; flex-direction: column; align-items: center; text-align: center;
     border-radius: 14px; background: var(--card-bg);
     border: 1px solid var(--glass-border);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
     box-shadow: 0 6px 18px rgba(0,0,0,.18);
     text-decoration: none; color: var(--text);
     transition: transform .25s, background .25s, border-color .25s, box-shadow .25s;
@@ -292,7 +270,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .site-img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
 .site-title { font-size: 11px; line-height: 1.25; color: var(--text); word-break: break-all; }
 .site-desc { font-size: 9.5px; color: var(--text-faint); margin-top: 2px; }
-
 /* ---------- 页脚（一排：左 / 中 / 右，始终贴在页面底端） ---------- */
 .footer { margin-top: 0; padding-top: clamp(12px, 2vh, 20px); }
 .footer-card {
@@ -322,7 +299,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
 }
 .footer-badge iconify-icon { color: var(--accent); }
 .stat-num { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 2px; }
-
 /* ---------- 右上角工具（固定于整个页面最右上角，位于淡出图层之外） ---------- */
 .wallpaper-tools {
     position: fixed; right: 14px; top: 14px; z-index: 60;
@@ -331,7 +307,7 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .tool-btn {
     width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
     border-radius: 12px; border: 1px solid var(--glass-border);
-    background: rgba(30,32,48,.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    background: rgba(30,32,48,.5); 
     color: var(--text-dim); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.25); transition: all .2s;
 }
 .tool-btn:hover { background: rgba(60,62,82,.72); color: #fff; transform: translateY(-2px); }
@@ -349,13 +325,12 @@ body.idle .wallpaper-overlay { opacity: 0; }
 }
 .tool-btn.loading iconify-icon { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
 /* ---------- 统一设置面板 ---------- */
 .settings-panel {
     position: fixed; right: 14px; top: 62px; z-index: 61;
     width: 280px; max-height: calc(100vh - 80px); overflow-y: auto;
     padding: 12px; border-radius: 14px;
-    background: rgba(30,32,48,.97); backdrop-filter: blur(16px);
+    background: rgba(30,32,48,.97); 
     border: 1px solid var(--glass-border); box-shadow: var(--shadow);
 }
 .settings-panel.hidden { display: none; }
@@ -400,7 +375,7 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .theme-wrap { position: relative; }
 .theme-menu {
     position: absolute; right: 0; top: calc(100% + 10px); width: 150px; padding: 8px;
-    border-radius: 12px; background: rgba(30,32,48,.96); backdrop-filter: blur(16px);
+    border-radius: 12px; background: rgba(30,32,48,.96); 
     border: 1px solid var(--glass-border); box-shadow: var(--shadow);
 }
 .theme-option {
@@ -430,11 +405,10 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .theme-custom .theme-check { visibility: hidden; }
 .theme-custom-arrow { margin-left: auto; color: var(--text-faint); }
 .theme-custom.active .theme-custom-arrow { visibility: hidden; }
-
 /* ---------- 自定义调色盘（主题风格） ---------- */
 .color-picker {
     position: absolute; right: 0; top: 0; width: 220px; padding: 12px;
-    border-radius: 12px; background: rgba(30,32,48,.98); backdrop-filter: blur(16px);
+    border-radius: 12px; background: rgba(30,32,48,.98); 
     border: 1px solid var(--glass-border); box-shadow: var(--shadow);
 }
 .color-picker.hidden { display: none; }
@@ -498,11 +472,10 @@ body.idle .wallpaper-overlay { opacity: 0; }
     transition: filter .15s;
 }
 .cp-apply:hover { filter: brightness(1.12); }
-
 .wp-source-wrap { position: relative; }
 .wp-source-menu {
     position: absolute; right: 0; top: calc(100% + 10px); width: 200px; padding: 8px;
-    border-radius: 12px; background: rgba(30,32,48,.96); backdrop-filter: blur(16px);
+    border-radius: 12px; background: rgba(30,32,48,.96); 
     border: 1px solid var(--glass-border); box-shadow: var(--shadow);
 }
 .wp-menu-title { padding: 4px 8px 8px; font-size: 11px; color: var(--text-faint); }
@@ -550,13 +523,12 @@ body.idle .wallpaper-overlay { opacity: 0; }
 }
 .wp-api-save:hover { filter: brightness(1.12); }
 .wp-api-hint { padding: 0 8px 4px; font-size: 10px; color: var(--text-faint); line-height: 1.4; }
-
 /* ---------- 自动换背景菜单 ---------- */
 .auto-wp-wrap { position: relative; }
 #autoWpBtn.on { color: var(--accent); border-color: rgba(var(--accent-rgb),.45); }
 .auto-wp-menu {
     position: absolute; right: 0; top: calc(100% + 10px); width: 220px; padding: 8px;
-    border-radius: 12px; background: rgba(30,32,48,.96); backdrop-filter: blur(16px);
+    border-radius: 12px; background: rgba(30,32,48,.96); 
     border: 1px solid var(--glass-border); box-shadow: var(--shadow);
 }
 .auto-wp-subtitle { padding-top: 10px; }
@@ -617,7 +589,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
     margin: 8px 6px 2px; padding-top: 8px; border-top: 1px solid var(--glass-border);
     font-size: 11px; color: var(--text-faint); text-align: center;
 }
-
 /* ---------- 音乐播放器（左下角） ---------- */
 .music-player {
     position: relative; z-index: 20;
@@ -704,7 +675,6 @@ body.idle .wallpaper-overlay { opacity: 0; }
 .mp-playlist-item .mpl-num { width: 16px; flex: none; font-size: 10px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .mp-playlist-item .mpl-name { flex: 1; min-width: 0; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mp-playlist-item .mpl-artist { font-size: 10px; color: var(--text-faint); }
-
 /* ============ 3D 酷炫跟随光标（渐进增强，触屏/老浏览器自动回退） ============ */
 .cursor-fx {
     position: fixed; top: 0; left: 0; width: 0; height: 0;
@@ -763,13 +733,11 @@ body.custom-cursor.hovering .cursor-halo {
 @media (hover: none), (pointer: coarse) {
     .cursor-fx { display: none !important; }
 }
-
 /* ---------- 滚动条 ---------- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
-
 /* ---------- 响应式 ---------- */
 /* 宽屏：强制 23 个图标收缩排在同一行（≥1280px） */
 @media (min-width: 1280px) {

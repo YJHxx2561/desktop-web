@@ -1726,39 +1726,33 @@
     function initIdleFade() {
         const layer = $('fadeLayer') || $('pageContent');
         if (!layer) return;
-        let timer = null, fadeInterval = null, hidden = false;
+        let timer = null, hidden = false;
         // 手动隐藏标记：为 true 时只响应页面内点击，鼠标移动/滚动/按键都不恢复
         let manualHidden = false;
+
+        // 淡出/淡入统一交给 CSS transition（无毛玻璃，无需逐帧重采样）
+        function hide(fast) {
+            if (hidden) return;
+            hidden = true;
+            const ms = fast ? 350 : 2000;
+            layer.style.transition = 'opacity ' + (ms / 1000) + 's ease';
+            layer.style.opacity = '0';
+            layer.style.pointerEvents = 'none'; // 淡出后不拦截壁纸交互
+        }
         function show() {
             manualHidden = false;
-            if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
-            // 恢复组件时同步恢复壁纸遮罩（壁纸回到变暗状态，保证文字可读）
-            document.body.classList.remove('idle');
-            if (hidden || layer.style.opacity !== '' && layer.style.opacity !== '1') {
-                layer.style.opacity = '1';
-                layer.style.pointerEvents = '';
-                hidden = false;
-            }
+            if (!hidden && layer.style.opacity === '1') return;
+            layer.style.transition = 'opacity .6s ease';
+            layer.style.opacity = '1';
+            layer.style.pointerEvents = '';
+            hidden = false;
         }
         function reset(e) {
             // 手动隐藏后，只有页面内任意点击（或触摸点击）才恢复组件
             if (manualHidden && (!e || e.type !== 'click')) return;
             show();
             if (timer) clearTimeout(timer);
-            timer = setTimeout(() => {
-                // 开始淡出时移除遮罩，让壁纸随组件一起恢复原有亮度
-                document.body.classList.add('idle');
-                let op = 1;
-                fadeInterval = setInterval(() => {
-                    op -= 0.05;
-                    if (op <= 0) {
-                        op = 0; clearInterval(fadeInterval); fadeInterval = null;
-                        hidden = true;
-                        layer.style.pointerEvents = 'none'; // 淡出后不拦截壁纸交互
-                    }
-                    layer.style.opacity = op;
-                }, 100);
-            }, 30000);
+            timer = setTimeout(function () { hide(false); }, 30000);
         }
         ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(ev => {
             document.addEventListener(ev, reset, { passive: true });
@@ -1770,13 +1764,8 @@
         if (hideBtn) hideBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             if (timer) { clearTimeout(timer); timer = null; }
-            if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
-            document.body.classList.add('idle');
-            hidden = true;
+            hide(true);
             manualHidden = true;
-            layer.style.transition = 'opacity .35s ease';
-            layer.style.opacity = '0';
-            layer.style.pointerEvents = 'none';
         });
     }
 
