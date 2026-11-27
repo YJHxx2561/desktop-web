@@ -494,6 +494,7 @@ body {
 .wp-sub-options { margin: 4px 6px 6px; padding: 6px 0 2px; border-top: 1px solid var(--glass-border); }
 .wp-sub-options .wp-sub-title { padding: 2px 2px 5px; }
 .wp-seg { display: flex; gap: 4px; }
+.wp-seg-col { flex-direction: column; }
 .wp-seg-btn {
     flex: 1; min-width: 0; padding: 6px 2px; border: 1px solid var(--glass-border);
     border-radius: 7px; background: rgba(255,255,255,.06); color: var(--text-dim);

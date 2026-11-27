@@ -295,18 +295,31 @@
                 <div id="wpSourceMenu" class="settings-section">
                     <div class="wp-menu-title">壁纸图源</div>
                     <button class="wp-source-option" data-source="dmoe"><span class="wp-dot"></span><span class="wp-source-name">樱花 DMOE · 二次元</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
-                    <button class="wp-source-option" data-source="php"><span class="wp-dot"></span><span class="wp-source-name">作者自建图源</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
-                    <button class="wp-source-option" data-source="selfhost"><span class="wp-dot"></span><span class="wp-source-name">作者自建随机图</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
+                    <button class="wp-source-option" data-source="selfhost"><span class="wp-dot"></span><span class="wp-source-name">作者自建图源</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
                     <button class="wp-source-option" data-source="mixed"><span class="wp-dot"></span><span class="wp-source-name">两者随机</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
                     <button class="wp-source-option" data-source="custom"><span class="wp-dot"></span><span class="wp-source-name">自定义图源</span><iconify-icon icon="mdi:check" class="wp-check" width="16" height="16"></iconify-icon></button>
-                    <!-- 作者自建图源（selfhost / php）的内容类型：图片 / ACG 动图 / 视频 -->
+                    <!-- 图集切换：主图库公开，绘本/精选需密码解锁 -->
+                    <div class="wp-sub-options hidden" id="wpGalleryOptions">
+                        <div class="wp-menu-title wp-sub-title">图集</div>
+                        <div class="wp-seg" id="wpGallerySeg">
+                            <button type="button" class="wp-seg-btn active" data-gallery="1" title="主图库">主图库</button>
+                            <button type="button" class="wp-seg-btn" data-gallery="mp" title="绘本图库（需密码）">绘本 <iconify-icon icon="mdi:lock" width="11" height="11"></iconify-icon></button>
+                            <button type="button" class="wp-seg-btn" data-gallery="p" title="精选图库（需密码）">精选 <iconify-icon icon="mdi:lock" width="11" height="11"></iconify-icon></button>
+                        </div>
+                    </div>
+                    <!-- 自建图源的 3 种接口方式（均为 img-api-function，顺序：imgss/php-infinityfree、imgs/php-serv00、img/cf-pages） -->
+                    <div class="wp-sub-options hidden" id="wpApiOptions">
+                        <div class="wp-menu-title wp-sub-title">自建接口</div>
+                        <div class="wp-seg wp-seg-col" id="wpApiSeg">
+                            <button type="button" class="wp-seg-btn active" data-api="imgss">InfinityFree</button>
+                            <button type="button" class="wp-seg-btn" data-api="imgs">Serv00</button>
+                            <button type="button" class="wp-seg-btn" data-api="img">Cloudflare Pages</button>
+                        </div>
+                    </div>
+                    <!-- 图集内容类型：由 JS 按当前图集动态生成（主图库=图片/acg/视频，mp/p=专辑） -->
                     <div class="wp-sub-options hidden" id="wpMediaOptions">
                         <div class="wp-menu-title wp-sub-title">返回内容</div>
-                        <div class="wp-seg" id="wpMediaSeg">
-                            <button type="button" class="wp-seg-btn active" data-media="image">图片</button>
-                            <button type="button" class="wp-seg-btn" data-media="acg">ACG 动图</button>
-                            <button type="button" class="wp-seg-btn" data-media="video">视频</button>
-                        </div>
+                        <div class="wp-seg" id="wpMediaSeg"></div>
                     </div>
                     <!-- CDN 选择：两种自建图源都支持，访问方式相同（默认 eo） -->
                     <div class="wp-sub-options hidden" id="wpCdnOptions">

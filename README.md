@@ -16,7 +16,7 @@
 | 天气 | 成都·郫都（主要）与南充·西充两地，温度、天气、高低温、空气质量，30 分钟自动刷新 |
 | 网站 dock | 常用网站快捷入口，宽屏一行、窄屏多排居中 |
 | 音乐播放器 | 65 首本地音乐，旋转封面、播放/暂停、上下曲、三种循环模式、音量、播放列表、系统媒体键 |
-| 壁纸 | 樱花 DMOE / 作者自建图源 / 作者自建随机图 / 两者随机（DMOE + 作者自建图源 PHP）/ 自定义图源，两种自建图源均可选返回图片、ACG 动图或视频，并可选 Cloudflare / EdgeOne 两条 CDN（访问方式相同，默认 EdgeOne）；视频静音自动循环、无播放控件 |
+| 壁纸 | 樱花 DMOE / 作者自建图源 / 两者随机 / 自定义图源四种；自建图源可选 InfinityFree、Serv00、Cloudflare Pages 三种平台接口，并可切换主图库/绘本图库/精选图库（后两者需密码解锁，会话内有效）与内容类型/专辑，可选 Cloudflare / EdgeOne CDN；视频静音自动循环、无播放控件 |
 | 主题色 | 琥珀 / 蔚蓝 / 青竹 / 紫藤 / 玫红 / 青蓝六色，全站联动 |
 | 闲置淡出 | 30 秒无操作后所有组件渐隐（任意操作恢复）；右上角「立即隐藏」按钮一键淡出后**只能点击页面恢复** |
 | 全屏 | 右上角全屏按钮进入/退出全屏，图标随状态切换 |
@@ -55,12 +55,53 @@
 |---|---|
 | 增删网站 | `SITES` 数组（复制一行改 `title`/`url`/`icon`，或删掉该行） |
 | 加搜索引擎 | `SEARCH_ENGINES` |
-| 换壁纸图源 | `WALLPAPER_SOURCES`；自建图源 CDN 在 `WALLPAPER_CDNS`（cf / eo） |
+| 换壁纸图源 | `WALLPAPER_SOURCES`；自建平台在 `WALLPAPER_APIS`（InfinityFree / Serv00 / Cloudflare Pages）、图集在 `WALLPAPER_GALLERIES`，CDN 在 `WALLPAPER_CDNS`（cf / eo） |
+| 改绘本/精选图集密码 | 见下方「修改图集密码」（改 `WALLPAPER_GALLERY_PASSWORD_HASH`） |
 | 加主题色 | `THEMES` |
 | 换天气城市 | `WEATHER_LOCATIONS`（经纬度可在 Open-Meteo 查询） |
 | 增删音乐 | `MUSIC_SONGS`，每首一行 `song(文件名, 歌名, 歌手)`；mp3 放 `assets/music/`，封面放 `assets/music/cover/`（同名，webp/jpg/png 自动识别） |
 | 改站点起始时间 | `UPTIME_START` |
 | 改统计后端 | `STATS_API` |
+
+#### 修改图集密码（绘本 / 精选）
+
+「作者自建图源」里的**绘本图库**和**精选图库**需要密码才能切换。密码**不以明文保存在代码里**，而是存 SHA-256 哈希。当前密码是 `123456`，对应哈希 `8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92`。
+
+改密码分两步：
+
+**第 1 步：算出新密码的哈希**
+
+在本项目目录打开终端（Bash / Git Bash）：
+
+```bash
+echo -n 你的新密码 | sha256sum
+```
+
+例如新密码是 `mypassword`：
+
+```bash
+echo -n mypassword | sha256sum
+# 输出：8f0e2c...（一串 64 位十六进制，前面那串就是哈希）
+```
+
+> 注意：`echo -n` 的 `-n` 不能省，否则会把结尾换行也算进密码，算出的哈希对不上。
+> Windows PowerShell 用户可用：`[System.BitConverter]::ToString(([System.Security.Cryptography.SHA256]::Create()).ComputeHash([Text.Encoding]::UTF8.GetBytes("你的新密码"))).Replace("-","").ToLower()`
+
+**第 2 步：替换配置里的哈希**
+
+打开 `assets/config.js`，找到这一行，把引号里的值换成第 1 步算出的 64 位哈希：
+
+```js
+const WALLPAPER_GALLERY_PASSWORD_HASH = '这里是新密码的SHA256哈希';
+```
+
+保存后刷新页面即可生效，无需构建。
+
+**补充说明**
+- 校验在浏览器本地进行（Web Crypto 的 SHA-256），密码不会上传到任何服务器。
+- 需要在 **HTTPS 或 localhost** 下打开页面才能校验（`file://` 直接双击打开时浏览器可能禁用加密接口，会导致密码校验失败）。
+- 解锁状态存在 `sessionStorage`，只在当前标签页有效；关闭标签页后需重新输入。
+- 忘记哈希时，用第 1 步的方法重新算一次并写入即可。
 
 > **新增网站/应用**：在 `SITES` 里加一行 `site(标题, 网址, 图标名)` 即可（见文件内 `site()` 辅助函数）。图标名来自 [Iconify](https://icon-sets.iconify.design/)，用新图标名时需把它加进 `assets/icons/icons-data.js` 的 `window.__ICONS__`（格式 `{"前缀:名称":{"body":"<svg内部内容>","w":24,"h":24}}`），否则图标空白；也可用 `img` 字段直接指定 `assets/icons/` 下的本地图片。
 >

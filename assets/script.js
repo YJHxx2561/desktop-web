@@ -11,6 +11,18 @@
     const SEARCH_ENGINES = CFG.searchEngines || {};
     const WALLPAPER_SOURCES = CFG.wallpaperSources || {};
     const WALLPAPER_CDNS = CFG.wallpaperCdns || {};
+    const WALLPAPER_APIS = CFG.wallpaperApis || {};
+    const WALLPAPER_GALLERIES = CFG.wallpaperGalleries || {};
+    const WALLPAPER_GALLERY_HASH = CFG.wallpaperGalleryPasswordHash || '';
+
+    // ---------- SHA-256 哈希（图集密码校验用，密码不明文存代码） ----------
+    function sha256(text) {
+        if (window.crypto && crypto.subtle) {
+            return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+                .then(buf => Array.prototype.map.call(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join(''));
+        }
+        return Promise.resolve(''); // file:// 下部分浏览器无 subtle，降级为始终校验失败
+    }
 
     // ---------- 存储辅助（隐私模式下 localStorage 可能抛错） ----------
     const store = {
@@ -309,6 +321,14 @@
     const wallpaper = (function () {
         let source = store.get('wallpaper-source', 'dmoe');
         if (!WALLPAPER_SOURCES[source]) source = 'dmoe';
+        // 自建图源接口方式：imgss / imgs / img（默认 imgss）
+        let api = store.get('wallpaper-api', 'imgss');
+        if (!WALLPAPER_APIS[api]) api = 'imgss';
+        // 图集：1 主图库 / mp 绘本 / p 精选；解锁状态仅存 sessionStorage（关闭标签页失效）
+        let gallery = '1';
+        let galleryType = store.get('wallpaper-gallery-type', 'image');
+        let unlocked = false;
+        try { unlocked = sessionStorage.getItem('wp-gallery-unlocked') === '1'; } catch (e) {}
         // 自建图源返回内容类型：image（按屏幕横竖）/ acg（动图）/ video（视频）
         let media = store.get('wallpaper-media', 'image');
         if (['image', 'acg', 'video'].indexOf(media) === -1) media = 'image';
@@ -327,28 +347,26 @@
         function orientation() {
             return window.innerWidth / window.innerHeight >= 1 ? 'landscape' : 'portrait';
         }
-        // Cloudflare Pages 函数接口：cf/eo 两条 CDN 路径完全一致
-        function apiPath(base, mode) {
-            const path = media === 'image' ? orientation() : media; // image → landscape/portrait
-            return base + path;
+        // 内容类型 ID：主图库按屏幕选横竖/动图/视频；mp/p 用专辑 ID
+        function mediaType() {
+            if (gallery !== '1') return galleryType;
+            return media === 'image' ? orientation() : media;
         }
-        // 虚拟主机 PHP 接口：api.php?path=xxx&cdn=cf|eo（别名同样可搭配 cdn）
-        function phpPath() {
-            const path = media === 'image' ? orientation() : media;
-            // 默认 eo 可省略，但显式带上更清晰、也便于切换后立即生效
-            return WALLPAPER_SOURCES.php.url + path + '&cdn=' + cdn;
+        // 自建图源 URL：三种接口均为 img-api-function 路由 /api/{repo}/{cdn}/{type}
+        function selfPath() {
+            const cfg = WALLPAPER_APIS[api] || WALLPAPER_APIS.imgss;
+            return cfg.base + gallery + '/' + cdn + '/' + mediaType();
         }
 
         function buildUrl() {
             // 自定义图源：直接返回图片地址，附加随机参数避免缓存
             if (source === 'custom' && customApi) return withBust(customApi);
-            // mixed：在樱花 DMOE 与作者自建图源（PHP）之间随机挑一个
+            // mixed：在樱花 DMOE 与作者自建图源（当前接口）之间随机挑一个
             if (source === 'dmoe') return withBust(WALLPAPER_SOURCES.dmoe.url);
-            if (source === 'php') return withBust(phpPath());
-            if (source === 'selfhost') return withBust(apiPath(WALLPAPER_CDNS[cdn].base, media));
-            // mixed：dmoe 或 php
+            if (source === 'selfhost') return withBust(selfPath());
+            // mixed：dmoe 或 自建
             if (Math.random() < 0.5) return withBust(WALLPAPER_SOURCES.dmoe.url);
-            return withBust(phpPath());
+            return withBust(selfPath());
         }
 
         // 双层交叉淡入淡出：新媒体在备用层准备好后淡入，再交换主/备层
@@ -532,17 +550,38 @@
             $$('.wp-source-option').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-source') === source);
             });
-            // 两种自建图源都显示内容类型与 CDN 选项（cf/eo 访问方式相同）
-            const mediaBox = $('wpMediaOptions'), cdnBox = $('wpCdnOptions');
-            const isApiSource = source === 'selfhost' || source === 'php';
+            // 自建图源才显示图集 / 接口方式 / 内容类型 / CDN 选项
+            const galleryBox = $('wpGalleryOptions');
+            const apiBox = $('wpApiOptions'), mediaBox = $('wpMediaOptions'), cdnBox = $('wpCdnOptions');
+            const isApiSource = source === 'selfhost';
+            if (galleryBox) galleryBox.classList.toggle('hidden', !isApiSource);
+            if (apiBox) apiBox.classList.toggle('hidden', !isApiSource);
             if (mediaBox) mediaBox.classList.toggle('hidden', !isApiSource);
             if (cdnBox) cdnBox.classList.toggle('hidden', !isApiSource);
-            $$('.wp-seg-btn[data-media]').forEach(b => {
-                b.classList.toggle('active', b.getAttribute('data-media') === media);
+            $$('.wp-seg-btn[data-gallery]').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-gallery') === gallery);
+            });
+            $$('.wp-seg-btn[data-api]').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-api') === api);
             });
             $$('.wp-seg-btn[data-cdn]').forEach(b => {
                 b.classList.toggle('active', b.getAttribute('data-cdn') === cdn);
             });
+            // 按当前图集动态生成「返回内容」按钮（主图库=图片/acg/视频；mp/p=专辑）
+            const seg = $('wpMediaSeg');
+            const cfg = WALLPAPER_GALLERIES[gallery] || WALLPAPER_GALLERIES['1'];
+            const currentType = gallery === '1' ? media : galleryType;
+            if (seg) {
+                seg.innerHTML = '';
+                cfg.types.forEach(t => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'wp-seg-btn' + (t.id === currentType ? ' active' : '');
+                    b.textContent = t.label;
+                    b.setAttribute('data-media-choice', t.id);
+                    seg.appendChild(b);
+                });
+            }
             // 选中自定义时展开 API 输入框并回填已保存地址
             const box = $('wpCustomApi');
             const input = $('wpCustomApiInput');
@@ -578,15 +617,63 @@
                 });
             });
 
-            // 作者自建图源：内容类型（图片 / ACG 动图 / 视频）
-            $$('.wp-seg-btn[data-media]').forEach(btn => {
+            // 自建图源：图集切换（mp/p 需密码解锁，会话内有效）
+            $$('.wp-seg-btn[data-gallery]').forEach(btn => {
                 btn.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    media = this.getAttribute('data-media');
-                    store.set('wallpaper-media', media);
+                    const picked = this.getAttribute('data-gallery');
+                    const cfg = WALLPAPER_GALLERIES[picked];
+                    if (cfg && cfg.locked && !unlocked) {
+                        const input = window.prompt('「' + cfg.name + '」需要密码，请输入：');
+                        if (input === null) return; // 用户取消
+                        sha256(input).then(function (hash) {
+                            if (hash && hash === WALLPAPER_GALLERY_HASH) {
+                                unlocked = true;
+                                try { sessionStorage.setItem('wp-gallery-unlocked', '1'); } catch (er) {}
+                                applyGallery(picked);
+                            } else {
+                                window.alert('密码错误，无法访问该图集。');
+                            }
+                        }).catch(function () { window.alert('当前环境无法校验密码（需 HTTPS 或 localhost）。'); });
+                        return;
+                    }
+                    applyGallery(picked);
+                });
+            });
+            function applyGallery(picked) {
+                gallery = picked;
+                const cfg = WALLPAPER_GALLERIES[picked] || WALLPAPER_GALLERIES['1'];
+                // 切图集时把类型重置为该图集第一项，避免沿用不适用的类型
+                galleryType = cfg.types[0].id;
+                store.set('wallpaper-gallery-type', galleryType);
+                applySourceMenu();
+                load();
+            }
+            // 自建图源：接口方式（imgss / imgs / img）
+            $$('.wp-seg-btn[data-api]').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    api = this.getAttribute('data-api');
+                    store.set('wallpaper-api', api);
                     applySourceMenu();
                     load();
                 });
+            });
+            // 自建图源：内容类型（按图集动态生成；主图库改 media，mp/p 改 galleryType）
+            $('wpMediaSeg') && $('wpMediaSeg').addEventListener('click', function (e) {
+                const btn = e.target.closest('[data-media-choice]');
+                if (!btn) return;
+                e.stopPropagation();
+                const choice = btn.getAttribute('data-media-choice');
+                if (gallery === '1') {
+                    media = choice;
+                    store.set('wallpaper-media', media);
+                } else {
+                    galleryType = choice;
+                    store.set('wallpaper-gallery-type', galleryType);
+                }
+                applySourceMenu();
+                load();
             });
             // 作者自建随机图：CDN 选择（cf / eo，访问方式相同）
             $$('.wp-seg-btn[data-cdn]').forEach(btn => {
