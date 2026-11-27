@@ -68,7 +68,7 @@
      *
      * 自建图源的 3 种接口（顺序即展示顺序），均由 img-api-function 搭建，
      * 路径模板 /api/1/{cdn}/{type}，只取主图库 repo=1（与现有自建图库内容一致）：
-     *   imgss  https://imgss.api.yjhup.com  PHP 平台 infinityfree
+     *   imgsss https://imgsss.api.yjhup.com  PHP 平台 HelioHost
      *   imgs   https://imgs.api.yjhup.com   PHP 平台 serv00
      *   img    https://img.api.yjhup.com    Cloudflare Pages Functions
      * cdn=cf/eo；type 为 landscape/portrait（按屏幕）、acg（动图）、video（视频）。
@@ -76,7 +76,7 @@
      */
     // 自建图源接口：域名不同但访问方式一致（统一取主图库 repo=1）
     const WALLPAPER_APIS = {
-        imgss: { name: 'InfinityFree', base: 'https://imgss.api.yjhup.com/api/' },
+        imgsss: { name: 'HelioHost', base: 'https://imgsss.api.yjhup.com/api/' },
         imgs:  { name: 'Serv00',       base: 'https://imgs.api.yjhup.com/api/' },
         img:   { name: 'Cloudflare Pages', base: 'https://img.api.yjhup.com/api/' }
     };
@@ -87,7 +87,7 @@
     };
     // 图集（repo）：1=主图库公开，mp/p 需密码解锁。
     // 密码不明文存储：这里存 SHA-256("123456")；如需改密码，替换此哈希即可。
-    const WALLPAPER_GALLERY_PASSWORD_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
+    const WALLPAPER_GALLERY_PASSWORD_HASH = 'e8d14712afcd674d958597b51fe1024a4fe309640c43e211157acb471b6fa02d';
     const WALLPAPER_GALLERIES = {
         '1':  { name: '主图库', locked: false, types: [
             { id: 'image', label: '图片' }, { id: 'acg', label: 'ACG 动图' }, { id: 'video', label: '视频' }
@@ -101,7 +101,7 @@
     };
     const WALLPAPER_SOURCES = {
         dmoe:     { name: '樱花 DMOE · 二次元', url: 'https://www.dmoe.cc/random.php' },
-        selfhost: { name: '作者自建图源', url: WALLPAPER_APIS.imgss.base },
+        selfhost: { name: '作者自建图源', url: WALLPAPER_APIS.imgsss.base },
         mixed:    { name: '两者随机', url: '' },
         custom:   { name: '自定义图源', url: '' } // API 地址由用户在页面上输入，保存在浏览器端
     };

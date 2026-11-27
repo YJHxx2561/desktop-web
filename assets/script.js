@@ -321,9 +321,11 @@
     const wallpaper = (function () {
         let source = store.get('wallpaper-source', 'dmoe');
         if (!WALLPAPER_SOURCES[source]) source = 'dmoe';
-        // 自建图源接口方式：imgss / imgs / img（默认 imgss）
-        let api = store.get('wallpaper-api', 'imgss');
-        if (!WALLPAPER_APIS[api]) api = 'imgss';
+        // 自建图源接口方式：imgsss / imgs / img（默认 imgsss）
+        let api = store.get('wallpaper-api', 'imgsss');
+        // 兼容旧版本：接口 ID imgss 已改名为 imgsss，迁移已保存的设置
+        if (api === 'imgss') { api = 'imgsss'; store.set('wallpaper-api', api); }
+        if (!WALLPAPER_APIS[api]) api = 'imgsss';
         // 图集：1 主图库 / mp 绘本 / p 精选；解锁状态仅存 sessionStorage（关闭标签页失效）
         let gallery = '1';
         let galleryType = store.get('wallpaper-gallery-type', 'image');
@@ -354,7 +356,7 @@
         }
         // 自建图源 URL：三种接口均为 img-api-function 路由 /api/{repo}/{cdn}/{type}
         function selfPath() {
-            const cfg = WALLPAPER_APIS[api] || WALLPAPER_APIS.imgss;
+            const cfg = WALLPAPER_APIS[api] || WALLPAPER_APIS.imgsss;
             return cfg.base + gallery + '/' + cdn + '/' + mediaType();
         }
 
@@ -649,7 +651,7 @@
                 applySourceMenu();
                 load();
             }
-            // 自建图源：接口方式（imgss / imgs / img）
+            // 自建图源：接口方式（imgsss / imgs / img）
             $$('.wp-seg-btn[data-api]').forEach(btn => {
                 btn.addEventListener('click', function (e) {
                     e.stopPropagation();

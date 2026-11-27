@@ -16,7 +16,7 @@
 | 天气 | 成都·郫都（主要）与南充·西充两地，温度、天气、高低温、空气质量，30 分钟自动刷新 |
 | 网站 dock | 常用网站快捷入口，宽屏一行、窄屏多排居中 |
 | 音乐播放器 | 65 首本地音乐，旋转封面、播放/暂停、上下曲、三种循环模式、音量、播放列表、系统媒体键 |
-| 壁纸 | 樱花 DMOE / 作者自建图源 / 两者随机 / 自定义图源四种；自建图源可选 InfinityFree、Serv00、Cloudflare Pages 三种平台接口，并可切换主图库/绘本图库/精选图库（后两者需密码解锁，会话内有效）与内容类型/专辑，可选 Cloudflare / EdgeOne CDN；视频静音自动循环、无播放控件 |
+| 壁纸 | 樱花 DMOE / 作者自建图源 / 两者随机 / 自定义图源四种；自建图源可选 HelioHost、Serv00、Cloudflare Pages 三种平台接口，并可切换主图库/绘本图库/精选图库（后两者需密码解锁，会话内有效）与内容类型/专辑，可选 Cloudflare / EdgeOne CDN；视频静音自动循环、无播放控件 |
 | 主题色 | 琥珀 / 蔚蓝 / 青竹 / 紫藤 / 玫红 / 青蓝六色，全站联动 |
 | 闲置淡出 | 30 秒无操作后所有组件渐隐（任意操作恢复）；右上角「立即隐藏」按钮一键淡出后**只能点击页面恢复** |
 | 全屏 | 右上角全屏按钮进入/退出全屏，图标随状态切换 |
@@ -55,7 +55,7 @@
 |---|---|
 | 增删网站 | `SITES` 数组（复制一行改 `title`/`url`/`icon`，或删掉该行） |
 | 加搜索引擎 | `SEARCH_ENGINES` |
-| 换壁纸图源 | `WALLPAPER_SOURCES`；自建平台在 `WALLPAPER_APIS`（InfinityFree / Serv00 / Cloudflare Pages）、图集在 `WALLPAPER_GALLERIES`，CDN 在 `WALLPAPER_CDNS`（cf / eo） |
+| 换壁纸图源 | `WALLPAPER_SOURCES`；自建平台在 `WALLPAPER_APIS`（HelioHost / Serv00 / Cloudflare Pages）、图集在 `WALLPAPER_GALLERIES`，CDN 在 `WALLPAPER_CDNS`（cf / eo） |
 | 改绘本/精选图集密码 | 见下方「修改图集密码」（改 `WALLPAPER_GALLERY_PASSWORD_HASH`） |
 | 加主题色 | `THEMES` |
 | 换天气城市 | `WEATHER_LOCATIONS`（经纬度可在 Open-Meteo 查询） |
